@@ -47,8 +47,9 @@ check("another program on this computer's page is refused",
       c.put("/api/settings", json={}, headers={"Origin": "http://localhost:3000", "Sec-Fetch-Site": "same-site"}).status_code, 403)
 check("another website cannot change things", c.post("/api/creators", json={"name": "x"}, headers={"Origin": "https://evil.example"}).status_code, 403)
 check("a made-up name pointing at this machine is refused", c.get("/api/status", headers={"Host": "evil.example:8765"}).status_code, 403)
-for host in ("localhost:8765", "192.168.1.20:8765", "[::1]:8765", "127.0.0.1"):
+for host in ("localhost:8765", "[::1]:8765", "127.0.0.1"):
     check(f"reached as {host}", c.get("/api/status", headers={"Host": host}).status_code, 200)
+check("an arbitrary IP host is refused", c.get("/api/status", headers={"Host": "192.168.1.20:8765"}).status_code, 403)
 
 # ---- the AI key, from the dashboard
 KEY = "test-key-abcdefgh12345678"

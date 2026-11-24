@@ -42,7 +42,7 @@ def _fix(c: dict) -> dict:
         c["channel"] = next((ch[k] for k in PLATFORMS if k in ch), "")
     return c
 NUMERIC = {"min_len": (5, 120), "max_len": (10, 180), "max_clips": (1, 20), "min_score": (0, 100), "buffer_min": (5, 120), "live_per_hour": (1, 60), "ai_every_min": (1, 30), "auto_jump_pct": (20, 300), "must_clip_min": (0, 240), "min_gap_min": (0, 60),
-           "post_min_score": (0, 100), "post_gap_min": (5, 1440), "daily_cap": (1, 50)}
+           "post_min_score": (0, 100), "post_gap_min": (0, 1440), "daily_cap": (1, 50)}
 
 
 def root(cid) -> Path:
@@ -77,7 +77,7 @@ def _clean(data: dict) -> dict:
         elif k == "plan":
             v = v if v in ("free", "pro", "max") else "free"
         elif k == "decide_mode":
-            v = v if v in ("both", "either") else "both"
+            v = v if v in ("both", "either", "action") else "both"
         elif k == "privacy":
             v = v if v in ("public", "unlisted", "private") else "public"
         else:
@@ -144,6 +144,8 @@ def create(data: dict) -> dict:
         cid, n = f"{slug}-{n}", n + 1
     c.update(id=cid, created=time.time())
     _write(c)
+    from . import branding
+    branding._store(cid, branding.DEFAULTS)
     log(cid, f"Workspace created for {c['name']}")
     return c
 

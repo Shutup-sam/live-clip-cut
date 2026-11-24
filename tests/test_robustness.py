@@ -2,6 +2,7 @@
 monitor on a system it cannot fully measure, a recording whose ffmpeg cannot start, and the admin day totals.
 Runs against the code directly, with its own empty data folder: nothing outside it is touched."""
 import os, sys, tempfile, threading, time
+from pathlib import Path
 os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-robust-"); os.environ["DATABASE_URL"] = ""
 sys.path.insert(0, ".")
 import sqlalchemy as sa
@@ -10,6 +11,8 @@ db.init()
 fails = []
 def check(n, ok, x=""):
     print(("PASS " if ok else "FAIL ") + n + (f"  {x}" if x else "")); ok or fails.append(n)
+
+check("YouTube channel streams page resolves through its live video", live.normalize("https://www.youtube.com/@Kreek/streams") == "https://www.youtube.com/@Kreek/live")
 
 # ---------------------------------------------------------------- the creator activity log
 a, _ = auth._create("a@example.com", "A", password_hash="x")
@@ -55,6 +58,33 @@ class Fake:
 f = Fake()
 live.Session._ingest(f)
 check("a recording that fails to start is marked ended, with the reason", f.ended and "Recording stopped" in f.job.get("error", ""), str(f.job))
+
+# A live feed can stop sending bytes while ffmpeg remains alive; the recorder must reconnect.
+class StalledProcess:
+    stdout = object()
+    terminated = False
+    def terminate(self): self.terminated = True
+    def wait(self): return 0
+class OneAttempt:
+    stopped = False
+    def is_set(self): return self.stopped
+    def wait(self, seconds): self.stopped = True
+class StalledSession:
+    stop_flag = OneAttempt()
+    job = {"source": {"url": "https://example.com/live"}, "uploader": "Streamer"}
+    samples = seg_clock = part = 0
+    lock = threading.RLock()
+    buf = dir = Path(tempfile.mkdtemp(prefix="pc-stall-"))
+old_resolve, old_popen, old_select = live.resolve, live.subprocess.Popen, live.select.select
+live.resolve = lambda url: {"urls": ["https://example.com/stream"], "title": "Live", "uploader": "Streamer"}
+live.subprocess.Popen = lambda *a, **k: StalledProcess()
+live.select.select = lambda *a: ([], [], [])
+try:
+    stalled = StalledSession()
+    live.Session._ingest_loop(stalled)
+    check("a silent stream process is terminated so recording can reconnect", stalled.proc.terminated and stalled.ended)
+finally:
+    live.resolve, live.subprocess.Popen, live.select.select = old_resolve, old_popen, old_select
 
 # ---------------------------------------------------------------- the admin day totals
 def noon(days_ago):      # midday of that calendar day, so no row sits near a day's edge

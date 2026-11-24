@@ -1,7 +1,9 @@
 """Live sessions: record a stream into a rolling buffer, transcribe as it goes, let the AI pick clips."""
 import collections
 import json
+import os
 import re
+import select
 import socket
 import ssl
 import subprocess
@@ -51,7 +53,7 @@ def normalize(url: str) -> str:
     url = url.strip()
     if not re.match(r"^https?://", url):
         url = "https://" + url
-    m = re.match(r"^(https?://(?:www\.)?youtube\.com/(?:@[^/?#]+|channel/[^/?#]+|c/[^/?#]+))/?(?:[?#].*)?$", url)
+    m = re.match(r"^(https?://(?:www\.)?youtube\.com/(?:@[^/?#]+|channel/[^/?#]+|c/[^/?#]+))(?:/streams)?/?(?:[?#].*)?$", url)
     return m.group(1) + "/live" if m else url
 
 
@@ -276,7 +278,11 @@ class Session:
                                              creationflags=media.NO_WINDOW)
                 got = 0
                 while True:
-                    data = self.proc.stdout.read(SR * 2)  # one second of 16-bit mono
+                    # shortcut: Windows cannot select a pipe; add a reader watchdog if live streams stall there.
+                    if os.name != "nt" and not select.select([self.proc.stdout], [], [], 45)[0]:
+                        self.proc.terminate()  # ffmpeg can stay alive after a live stream stops sending data
+                        break
+                    data = os.read(self.proc.stdout.fileno(), SR * 2)  # available 16-bit mono audio
                     if not data:
                         break
                     data = data[: len(data) // 2 * 2]
@@ -460,7 +466,7 @@ class Session:
         last_clip = max((c.get("made_at", 0) for c in self.job["clips"]), default=self.started_at)
         must = st["must_clip_min"] > 0 and time.time() - last_clip >= st["must_clip_min"] * 60
         verdict = {"t": round(now), "transcript": None, "reaction": None, "trigger": why}
-        if len(win) < 8:
+        if len(win) < 8 and st["decide_mode"] != "action":
             self.skipped += 1
             return self._verdict(verdict, "Skipped: nobody talking")
         if len(recent) >= st["live_per_hour"] and not must:
@@ -474,12 +480,14 @@ class Session:
                                                 timeout=config.LIVE_AI_TIMEOUT)  # Auto (0) asks for one
         except Exception as e:  # noqa: BLE001
             self.job["ai"]["last_error"] = str(e)[-200:]
-            return self._verdict(verdict, "AI error: " + str(e)[-80:])
+            if st["decide_mode"] != "action":
+                return self._verdict(verdict, "AI error: " + str(e)[-80:])
+            cands, tok = [], 0
         self.checks += 1
         self.tokens += tok
         keep = [c for c in cands if c["score"] >= (40 if must else st["min_score"])]
         verdict["transcript"] = max((c["score"] for c in cands), default=0)
-        if not keep:
+        if not keep and st["decide_mode"] != "action":
             return self._verdict(verdict, "Words judge: nothing clip-worthy")
         z = brain.loud_zscore(np.array(self.db, dtype=np.float32))
         lo, hi = int(ws), int(now) + 1
@@ -521,6 +529,23 @@ class Session:
             must = False
             if added >= (1 if every <= 2 else 2):
                 break
+        if st["decide_mode"] == "action" and not added:
+            for m in sorted(sig, key=lambda x: -x["score"]):
+                if m["score"] < 80:
+                    break
+                start = max(0.0, min(m["start"] - 15, now - st["min_len"]))
+                end = min(now, start + st["max_len"], max(m["end"] + 10, start + st["min_len"]))
+                if end - start < st["min_len"] or any(abs(start - k["start"]) < st["min_gap_min"] * 60 for k in self.job["clips"]):
+                    continue
+                game = self._game()
+                c = {"start": round(start, 2), "end": round(end, 2), "score": m["score"], "category": "other",
+                     "hook": "ACTION MOMENT", "title": f"{game or 'Live'} action moment", "description": "",
+                     "hashtags": games.tags_of(game), "highlight_words": [], "reason": "Strong live reaction signal",
+                     "judges": {"words": verdict["transcript"], "reaction": m["score"], "why": "Strong reaction without words"}}
+                self._add_clip(c)
+                return self._verdict(verdict, "Clipped: strong reaction without words")
+        if not added:
+            self._verdict(verdict, "Reaction judge: nothing strong enough to clip" if st["decide_mode"] == "action" else "Words judge: nothing clip-worthy")
 
     def _verdict(self, v, result):
         self.verdicts.append(dict(v, result=result))
@@ -791,7 +816,7 @@ def start_session(creator: dict, url=None) -> dict:
     if len(active_mine()) >= config.MAX_LIVE_PER_USER:
         raise ValueError(f"You're already recording {len(active_mine())} streams, the most this server allows at once. Stop one first.")
     if len(active()) >= config.MAX_LIVE_TOTAL or (active() and load.busy()):
-        raise ValueError("PeakCut is recording as many streams as it can right now. Try again in a little while.")
+        raise ValueError("Live Clip Cut is recording as many streams as it can right now. Try again in a little while.")
     from . import tools
     if tools.missing():
         raise ValueError(tools.HELP)

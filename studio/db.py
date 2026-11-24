@@ -24,6 +24,27 @@ if _SQLITE:
         cur.close()
 meta = sa.MetaData()
 
+creator_branding = sa.Table(
+    "creator_branding", meta,
+    sa.Column("user_id", sa.String(40), primary_key=True),
+    sa.Column("creator_id", sa.String(60), primary_key=True),
+    sa.Column("logo_asset_path", sa.String(100), nullable=False, server_default=""),
+    sa.Column("enabled", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("position", sa.String(20), nullable=False, server_default="top_right"),
+    sa.Column("width", sa.Integer, nullable=False, server_default="20"),
+    sa.Column("opacity", sa.Integer, nullable=False, server_default="100"),
+    sa.Column("padding", sa.Integer, nullable=False, server_default="24"),
+    sa.Column("background_enabled", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("display_duration", sa.String(12), nullable=False, server_default="entire"),
+    sa.Column("custom_start_time", sa.Float, nullable=False, server_default="0"),
+    sa.Column("custom_end_time", sa.Float, nullable=False, server_default="0"),
+    sa.Column("second_logo_asset_path", sa.String(100), nullable=False, server_default=""),
+    sa.Column("second_enabled", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("second_position", sa.String(20), nullable=False, server_default="bottom_right"),
+    sa.Column("second_width", sa.Integer, nullable=False, server_default="15"),
+    sa.Column("updated_at", sa.Float, nullable=False),
+)
+
 users = sa.Table(
     "users", meta,
     sa.Column("id", sa.String(40), primary_key=True),
@@ -114,6 +135,15 @@ admin_log = sa.Table(                                                         # 
 
 def init():
     meta.create_all(engine)
+    columns = {c["name"] for c in sa.inspect(engine).get_columns("creator_branding")}
+    additions = {"second_logo_asset_path": "VARCHAR(100) NOT NULL DEFAULT ''",
+                 "second_enabled": "BOOLEAN NOT NULL DEFAULT FALSE",
+                 "second_position": "VARCHAR(20) NOT NULL DEFAULT 'bottom_right'",
+                 "second_width": "INTEGER NOT NULL DEFAULT 15"}
+    with engine.begin() as conn:
+        for name, definition in additions.items():
+            if name not in columns:
+                conn.execute(sa.text(f"ALTER TABLE creator_branding ADD COLUMN {name} {definition}"))
 
 
 def now() -> float:

@@ -2,7 +2,7 @@
 
     python tests/run.py
 
-Starts PeakCut on a spare port with an empty, temporary data folder, runs the tests against it, then stops it and
+Starts Live Clip Cut on a spare port with an empty, temporary data folder, runs the tests against it, then stops it and
 deletes the folder. Your real data and your running server are never touched. No AI key is needed: the tests cover accounts, permissions, limits and the queue, not clip quality."""
 import os
 import shutil
@@ -52,8 +52,11 @@ def main() -> int:
                 ("big uploads in pieces", ["tests/test_upload_parts.py", BASE]),
                 ("AI services", ["tests/test_ai.py"]),
                 ("no sign-in, and the AI key from the dashboard", ["tests/test_local.py"]),
+                ("public HTTPS host and Instagram callback", ["tests/test_public_url.py"]),
+                ("Instagram Unified Login", ["tests/test_unified_instagram.py"]),
                 ("Hindi and Urdu captions in Roman letters", ["tests/test_roman.py"]),
                 ("turning captions off and back on", ["tests/test_captions.py"]),
+                ("creator branding and logo renders", ["tests/test_branding.py"]),
                 ("connecting YouTube, Instagram and TikTok", ["tests/test_connect.py"]),
                 ("the new-version notice", ["tests/test_updates.py"]),
                 ("no limits by default", ["tests/test_limits.py"]),

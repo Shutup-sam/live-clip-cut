@@ -125,6 +125,9 @@ def delete_creator(cid: str) -> dict:
         jobs.delete(j["id"])
     with creators._lock:
         creators._mine().pop(cid, None)
+    with db.engine.begin() as conn:
+        conn.execute(db.creator_branding.delete().where(db.creator_branding.c.user_id == ctx.uid(),
+                                                        db.creator_branding.c.creator_id == cid))
     shutil.rmtree(creators.root(cid), ignore_errors=True)
     ctx.bump()
     return {"ok": True, "videos": len(mine)}

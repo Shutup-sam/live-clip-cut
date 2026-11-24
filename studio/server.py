@@ -1,4 +1,4 @@
-"""PeakCut web server. Run with:  python -m studio.server
+"""Live Clip Cut web server. Run with:  python -m studio.server
 
 Public pages:  /  /login  /signup          The app:  /app  (signed-in users only)
 Everything under /api, /media and /oauth needs a session, except /api/auth/* and /api/public."""
@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Redirect
 
 from . import admin as admins
 from . import account, load
-from . import (accounts, ai, alerts, auth, config, creators, ctx, db, jobs, live, media, posting,
+from . import (accounts, ai, alerts, auth, branding, config, creators, ctx, db, jobs, live, media, posting,
                profiles, render, safe, transcribe, usage)
 
 from . import tools as _tools  # noqa: E402
@@ -34,7 +34,7 @@ def _quiet(fn):
         print(f"  {e}", flush=True)
 
 
-app = FastAPI(title="PeakCut", docs_url=None, redoc_url=None, openapi_url=None)
+app = FastAPI(title="Live Clip Cut", docs_url=None, redoc_url=None, openapi_url=None)
 WEB = config.ROOT / "web"
 OPEN = ("/api/auth/", "/pub/", "/api/public", "/auth/google/", "/auth/verify", "/brand/", "/assets/", "/healthz", "/favicon.ico", "/robots.txt", "/sitemap.xml")
 PAGES = {"/": "landing.html", "/login": "auth.html", "/signup": "auth.html", "/reset": "reset.html",
@@ -73,7 +73,7 @@ def _startup():
     live.start()
     posting.start()
     from . import updates
-    updates.start()                  # looks for a newer PeakCut every minute, in the background
+    updates.start()                  # looks for a newer Live Clip Cut every minute, in the background
 
 
 # ================================================================ the gate: who is asking, and are they allowed
@@ -95,6 +95,9 @@ class Gate:
             resp = RedirectResponse(redirect, 303, headers=no_keep) if redirect else JSONResponse({"detail": msg}, status, headers=no_keep)
             await resp(scope, receive, send)
 
+        if not _own_address(req.headers.get("host", "")):
+            return await deny(403, "Open Live Clip Cut by its own address.")
+
         if method not in ("GET", "HEAD", "OPTIONS"):
             if not _from_here(req):
                 return await deny(403, "Cross-site requests are not allowed.")
@@ -102,7 +105,7 @@ class Gate:
             # headers claim, so nobody can fill the server's memory by posting junk (signed in or not).
             piece = method == "PUT" and path.startswith("/api/upload/")
             cap = ((min(config.MAX_UPLOAD_MB, config.UPLOAD_PART_MB) if piece else config.MAX_UPLOAD_MB) + 8) * 1024 * 1024 \
-                if path == "/api/upload" or piece else 256 * 1024
+                if path == "/api/upload" or piece else (branding.MAX_BYTES + 1024 * 1024 if path.endswith(("/branding/logo", "/branding/logo2")) else 256 * 1024)
             try:
                 if int(req.headers.get("content-length") or 0) > cap:
                     return await deny(413, f"That file is too big. The limit is {config.MAX_UPLOAD_MB} MB." if path == "/api/upload" else "That request is too large.")
@@ -127,11 +130,7 @@ class Gate:
             user = user[1] if user and time.time() - user[0] < auth.SESS_FOR else (
                 await run_in_threadpool(auth.user_for, cookie, admin_area) if cookie else None)
         else:
-            # No sign-in: whoever opens the page is the owner. Because nothing else stands in the way, the page
-            # must have been asked for by its real address (a number, "localhost", or the address in settings),
-            # so another website cannot reach it through a made-up name that points at this machine.
-            if not _own_address(req.headers.get("host", "")):
-                return await deny(403, "Open PeakCut by its own address.")
+            # No sign-in: whoever opens the page is the owner.
             if path == "/" or path == "/reset" or path.startswith("/auth/"):
                 return await deny(303, "", redirect="/app")
             if path.startswith("/api/auth/") and path != "/api/auth/me":
@@ -265,7 +264,7 @@ def _ip(request: Request) -> str:
 
 
 def _from_here(req, must_say=False) -> bool:
-    """Did this change come from PeakCut's own page, and not from another website?
+    """Did this change come from Live Clip Cut's own page, and not from another website?
 
     The browser's own answer is trusted first: it marks every request "same-origin" or not, and a web page cannot
     fake that mark. Comparing the page's address with the address the request arrived at is only the fallback,
@@ -280,18 +279,12 @@ def _from_here(req, must_say=False) -> bool:
 
 
 def _own_address(host: str) -> bool:
-    """Is this the address PeakCut is really reached by? A number (127.0.0.1, 192.168.1.20), "localhost", or the
-    host in PEAKCUT_PUBLIC_URL."""
-    import ipaddress
-    name = host.strip().lower()
-    name = name[1:name.index("]")] if name.startswith("[") and "]" in name else name.rsplit(":", 1)[0] if ":" in name else name
-    if name in ("localhost", urlparse(config.PUBLIC_URL).hostname or "") or name.endswith(".localhost"):
-        return True
-    try:
-        ipaddress.ip_address(name)
-        return True
-    except ValueError:
-        return False
+    """Accept only the configured public address and local development addresses."""
+    local = ("localhost", "127.0.0.1", "[::1]")
+    public = urlparse(config.PUBLIC_URL)
+    ports = {config.PORT, public.port} - {None}
+    allowed = {public.netloc.lower(), *local, *(f"{name}:{port}" for name in local for port in ports)}
+    return host.strip().lower() in allowed
 
 
 def _me(request: Request):
@@ -364,9 +357,9 @@ def reset_page():
 
 
 LEGAL = {
-    "privacy": ("Privacy Policy", "How PeakCut collects, uses and protects your data, including Google user data, cookies and your privacy rights."),
-    "terms": ("Terms of Service", "The terms for using PeakCut, the AI clipping tool for streams and videos: accounts, availability and liability."),
-    "acceptable-use": ("Acceptable Use Policy", "What you may and may not do with PeakCut, the AI stream clipping tool."),
+    "privacy": ("Privacy Policy", "How Live Clip Cut collects, uses and protects your data, including Google user data, cookies and your privacy rights."),
+    "terms": ("Terms of Service", "The terms for using Live Clip Cut, the AI clipping tool for streams and videos: accounts, availability and liability."),
+    "acceptable-use": ("Acceptable Use Policy", "What you may and may not do with Live Clip Cut, the AI stream clipping tool."),
 }
 
 
@@ -381,9 +374,9 @@ def legal_page(request: Request):
     contact = config.CONTACT_EMAIL
     who = (f'<a href="mailto:{_h.escape(contact)}">{_h.escape(contact)}</a>' if contact
            else "the contact details on our website")
-    name = _h.escape(config.LEGAL_NAME or "PeakCut")
+    name = _h.escape(config.LEGAL_NAME or "Live Clip Cut")
     law = (f"the laws of {_h.escape(config.LEGAL_COUNTRY)}" if config.LEGAL_COUNTRY
-           else "the laws of the country where PeakCut's operator is established")
+           else "the laws of the country where Live Clip Cut's operator is established")
     out = (_LEGAL_HTML or (WEB / "legal.html").read_text(encoding="utf-8"))
     for k, v in {"{{CONTACT}}": who, "{{PAGE}}": page, "{{PAGE_PATH}}": page, "{{SITE}}": _h.escape(config.PUBLIC_URL),
                  "{{NAME}}": name, "{{LAW}}": law, "{{TITLE}}": title, "{{DESC}}": desc}.items():
@@ -644,7 +637,8 @@ def _creator_rows():
         if profiles.needs_refresh(c):
             profiles.refresh(c["id"])
         s = live.active_for(c["id"])
-        out.append({**c, "live_job": s.job["id"] if s else None, "log": creators.read_log(c["id"], 30)})
+        out.append({**c, "branding": branding.get(c["id"]), "live_job": s.job["id"] if s else None,
+                    "log": creators.read_log(c["id"], 30)})
     return out
 
 
@@ -1054,7 +1048,7 @@ def email_preview(request: Request, kind: str = "verify"):
     from . import mailer
     _admin(request)
     if kind == "reset":
-        page = mailer.preview("Reset your password", "Someone asked to reset the password for this PeakCut account. If that was you, choose a new one below.",
+        page = mailer.preview("Reset your password", "Someone asked to reset the password for this Live Clip Cut account. If that was you, choose a new one below.",
                               "Choose a new password", config.PUBLIC_URL + "/reset?t=example",
                               "The link works for one hour. If you didn't ask for this, ignore this email and your password stays the same.")
     else:
@@ -1069,9 +1063,9 @@ def test_email(request: Request):
     me_ = _admin(request)
     if not mailer.ready():
         raise HTTPException(400, "No email service is set up yet. Add the PEAKCUT_SMTP settings to .env first.")
-    mailer.send(me_.email, "PeakCut test email", "Your emails are working",
-                "This is a test from your PeakCut server. Account emails like this one will now reach people.",
-                "Open PeakCut", config.PUBLIC_URL + "/app", "You can ignore this message.")
+    mailer.send(me_.email, "Live Clip Cut test email", "Your emails are working",
+                "This is a test from your Live Clip Cut server. Account emails like this one will now reach people.",
+                "Open Live Clip Cut", config.PUBLIC_URL + "/app", "You can ignore this message.")
     return {"sent_to": me_.email}
 
 
@@ -1198,6 +1192,86 @@ def edit_creator(cid: str, body: dict = Body(...)):
     if body.get("auto_watch") and c.get("auto_watch") and not s:
         live.check_now(cid)    # if they are live right now, recording starts within seconds
     return c
+
+
+@app.get("/api/creators/{cid}/branding")
+def branding_get(cid: str):
+    try:
+        return branding.get(cid)
+    except KeyError:
+        raise HTTPException(404, "No such creator")
+
+
+@app.put("/api/creators/{cid}/branding")
+def branding_save(cid: str, body: dict = Body(...)):
+    try:
+        return branding.save(cid, body)
+    except KeyError:
+        raise HTTPException(404, "No such creator")
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/creators/{cid}/branding/logo")
+async def branding_upload(cid: str, file: UploadFile = File(...)):
+    if not creators.get(cid):
+        raise HTTPException(404, "No such creator")
+    content = await file.read(branding.MAX_BYTES + 1)
+    try:
+        return branding.upload(cid, file.filename or "", content)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.post("/api/creators/{cid}/branding/logo2")
+async def branding_upload_second(cid: str, file: UploadFile = File(...)):
+    if not creators.get(cid):
+        raise HTTPException(404, "No such creator")
+    content = await file.read(branding.MAX_BYTES + 1)
+    try:
+        return branding.upload(cid, file.filename or "", content, second=True)
+    except ValueError as e:
+        raise HTTPException(400, str(e))
+
+
+@app.delete("/api/creators/{cid}/branding/logo")
+def branding_remove(cid: str):
+    try:
+        return branding.remove(cid)
+    except KeyError:
+        raise HTTPException(404, "No such creator")
+
+
+@app.delete("/api/creators/{cid}/branding/logo2")
+def branding_remove_second(cid: str):
+    try:
+        return branding.remove(cid, second=True)
+    except KeyError:
+        raise HTTPException(404, "No such creator")
+
+
+@app.get("/api/creators/{cid}/branding/logo")
+def branding_logo(cid: str):
+    try:
+        settings = branding.get(cid)
+    except KeyError:
+        raise HTTPException(404, "No such creator")
+    path = branding.logo_path(cid, settings)
+    if not path or not path.is_file():
+        raise HTTPException(404, "No logo uploaded")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, no-store"})
+
+
+@app.get("/api/creators/{cid}/branding/logo2")
+def branding_logo_second(cid: str):
+    try:
+        settings = branding.get(cid)
+    except KeyError:
+        raise HTTPException(404, "No such creator")
+    path = branding.logo_path(cid, settings, second=True)
+    if not path or not path.is_file():
+        raise HTTPException(404, "No second logo uploaded")
+    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, no-store"})
 
 
 @app.post("/api/creators/{cid}/live")
@@ -1384,9 +1458,9 @@ def public_clip(token: str):
     return FileResponse(f, media_type="video/mp4", headers={"Cache-Control": "private, no-store"})
 
 
-# ---------------------------------------------------------------- where PeakCut keeps everything (Settings, Storage)
+# ---------------------------------------------------------------- where Live Clip Cut keeps everything (Settings, Storage)
 def _on_this_computer(request: Request) -> bool:
-    """Is the person sitting at the computer PeakCut runs on? Only then can a folder window be opened for them."""
+    """Is the person sitting at the computer Live Clip Cut runs on? Only then can a folder window be opened for them."""
     host = request.client.host if request.client else ""
     return host in ("127.0.0.1", "::1", "localhost") and not config.env("PEAKCUT_TRUST_PROXY")
 
@@ -1403,7 +1477,7 @@ def storage_open(request: Request):
     from . import storage
     _admin(request)
     if not _on_this_computer(request):
-        raise HTTPException(400, "The folder can only be opened on the computer PeakCut runs on.")
+        raise HTTPException(400, "The folder can only be opened on the computer Live Clip Cut runs on.")
     try:
         storage.open_folder()
     except OSError as e:
@@ -1416,7 +1490,7 @@ def storage_pick(request: Request):
     from . import storage
     _admin(request)
     if not _on_this_computer(request):
-        raise HTTPException(400, "Type the folder's path instead: a folder window can only be shown on the computer PeakCut runs on.")
+        raise HTTPException(400, "Type the folder's path instead: a folder window can only be shown on the computer Live Clip Cut runs on.")
     return {"path": storage.pick_folder()}
 
 
@@ -1455,7 +1529,10 @@ def add_posts(body: dict = Body(...)):
     clip = next((c for c in job["clips"] if c["id"] == body.get("clip")), None) if job else None
     if not clip or clip.get("status") != "done":
         raise HTTPException(404, "That clip is not ready")
-    made = posting.enqueue(job, clip, [str(a) for a in body.get("accounts", [])][:20], now=bool(body.get("now")))
+    try:
+        made = posting.enqueue(job, clip, [str(a) for a in body.get("accounts", [])][:20], now=bool(body.get("now")))
+    except ValueError as e:
+        raise HTTPException(409, str(e))
     if not made:
         raise HTTPException(400, "Nothing was queued. Pick at least one account this clip has not already gone to.")
     return {"queued": len(made)}
@@ -1483,7 +1560,7 @@ def test_alert():
         auth_problem = str(e)
     if auth_problem:
         raise HTTPException(429, auth_problem)
-    problems = alerts.send("PeakCut: test message. Alerts are working.")
+    problems = alerts.send("Live Clip Cut: test message. Alerts are working.")
     if problems:
         raise HTTPException(400, "; ".join(problems))
     return {"ok": True}
@@ -1541,18 +1618,18 @@ def admin_delete_user(request: Request, uid: str, body: dict = Body(...)):
 
 
 def main():
-    print(f"\n  PeakCut is running:  {config.PUBLIC_URL}\n")
+    print(f"\n  Live Clip Cut is running:  {config.PUBLIC_URL}\n")
     if not config.ACCOUNTS and (config.HTTPS or config.HOST not in ("127.0.0.1", "localhost", "::1")):
-        print("  Sign-in is off, so anyone who can reach this address can use PeakCut and its AI key.\n"
+        print("  Sign-in is off, so anyone who can reach this address can use Live Clip Cut and its AI key.\n"
               "  On a server other people can reach, set PEAKCUT_ACCOUNTS=1 in .env.\n", flush=True)
     if config.env("PEAKCUT_AUTO_RELOAD") == "1":
         # restart by itself whenever the server code changes (pages in web/ never need a restart)
         uvicorn.run("studio.server:app", host=config.HOST, port=config.PORT, log_level="warning", backlog=4096, reload=True,
                     reload_dirs=[str(config.ROOT / "studio")], reload_includes=["*.py"],
-                    proxy_headers=bool(config.env("PEAKCUT_TRUST_PROXY")), forwarded_allow_ips="*")
+                    proxy_headers=bool(config.env("PEAKCUT_TRUST_PROXY")), forwarded_allow_ips="127.0.0.1,::1")
         return
     uvicorn.run(app, host=config.HOST, port=config.PORT, log_level="warning", backlog=4096,
-                proxy_headers=bool(config.env("PEAKCUT_TRUST_PROXY")), forwarded_allow_ips="*")
+                proxy_headers=bool(config.env("PEAKCUT_TRUST_PROXY")), forwarded_allow_ips="127.0.0.1,::1")
 
 
 if __name__ == "__main__":

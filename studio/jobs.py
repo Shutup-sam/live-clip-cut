@@ -383,8 +383,14 @@ def render_one(job, clip, words):
             clip["end"] = min(clip["end"], job["duration"])
         local = dict(clip, start=clip["start"] - off, end=clip["end"] - off, hook=roman.to_roman(clip.get("hook") or ""))
         near = _caption_words(job, clip, words, off) if clip.get("captions", True) else []
-        out = render.render_clip(src, d / "clips", clip["id"], local, near, job["width"], job["height"])
-        clip.update(out, status="done", version=clip.get("version", 0) + 1, error=None)
+        from . import branding
+        brand = branding.get(job["creator"]) if job.get("creator") else None
+        logo = branding.logo_path(job["creator"], brand) if brand and brand["enabled"] else None
+        second_logo = branding.logo_path(job["creator"], brand, second=True) if brand and brand["second_enabled"] else None
+        out = render.render_clip(src, d / "clips", clip["id"], local, near, job["width"], job["height"], brand, logo, second_logo)
+        clip.update(out, status="done", version=clip.get("version", 0) + 1, error=None,
+                    branding_logo=brand["logo_asset_path"] if brand and brand["enabled"] else "",
+                    branding_second_logo=brand["second_logo_asset_path"] if brand and brand["second_enabled"] else "")
         post = {k: clip[k] for k in ("title", "description", "hashtags", "hook", "start", "end", "score")}
         (d / "clips" / f"{clip['id']}.json").write_text(json.dumps(post, indent=1), encoding="utf-8")
         if clip["version"] == 1:

@@ -55,7 +55,7 @@ def _mirror(p):
 def _next_slot(account_id, gap_min, cap):
     """Earliest time that respects the gap between posts and the daily cap for this account."""
     mine = [p for p in _mine() if p["account"] == account_id and p["status"] in OPEN + ("posted",)]
-    t = max(time.time(), max((p.get("posted_at") or p["due_at"] for p in mine), default=0) + gap_min * 60)
+    t = time.time() if gap_min == 0 else max(time.time(), max((p.get("posted_at") or p["due_at"] for p in mine), default=0) + gap_min * 60)
     for _ in range(30):
         if sum(1 for p in mine if _day(p.get("posted_at") or p["due_at"]) == _day(t)) < cap:
             break
@@ -65,6 +65,7 @@ def _next_slot(account_id, gap_min, cap):
 
 
 def enqueue(job, clip, account_ids, now=False) -> list:
+    _require_branding(job, clip)
     c = creators.get(job["creator"]) or creators.DEFAULTS
     made = []
     with _lock:
@@ -86,6 +87,14 @@ def enqueue(job, clip, account_ids, now=False) -> list:
     for p in made:
         _mirror(p)
     return made
+
+
+def _require_branding(job, clip):
+    if job.get("creator"):
+        from . import branding
+        settings = branding.get(job["creator"])
+        if (settings["enabled"] and not clip.get("branding_logo")) or (settings["second_enabled"] and not clip.get("branding_second_logo")):
+            raise ValueError("This clip was made before branding was enabled. Re-render it before posting.")
 
 
 def on_clip_ready(job, clip):
@@ -112,6 +121,7 @@ def _post(p):
     try:
         if not clip or clip.get("status") != "done":
             raise RuntimeError("The clip no longer exists or is not finished.")
+        _require_branding(job, clip)
         if not acc:
             raise RuntimeError("That account was disconnected.")
         path = Path(job["dir"]) / "clips" / clip["file"]
@@ -142,7 +152,7 @@ def _post(p):
 
 def _run():
     while True:
-        time.sleep(15)
+        time.sleep(2)
         due = [p for p in list(_posts) if p["status"] == "scheduled" and p["due_at"] <= time.time() and p.get("user")]
         for p in due:
             try:
@@ -248,7 +258,7 @@ def overview() -> dict:
 
 def digest_text() -> str:
     o = overview()
-    lines = ["PeakCut daily summary"]
+    lines = ["Live Clip Cut daily summary"]
     for r in o["creators"]:
         lines.append(f"- {r['name']}: {r['state']}, {r['clips_today']} clips today, {r['posted_today']} posted today, "
                      f"{r['queued']} waiting, {r['failed']} failed, {r['views']} views")

@@ -264,7 +264,8 @@ _qsv_ok = None
 RENDER_SECONDS = 600      # one clip's video encode; far beyond normal, so a frozen encoder is stopped, not waited on
 
 
-def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, src_w: int, src_h: int) -> dict:
+def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, src_w: int, src_h: int,
+                branding: dict | None = None, logo: Path | None = None, second_logo: Path | None = None) -> dict:
     """Writes <name>.mp4, <name>.jpg and <name>.ass into out_dir. Returns file names."""
     out_dir.mkdir(parents=True, exist_ok=True)
     start, end = clip["start"], clip["end"]
@@ -281,20 +282,55 @@ def render_clip(src: Path, out_dir: Path, name: str, clip: dict, words: list, sr
     # break the filter syntax).
     work = Path(tempfile.mkdtemp(prefix="pk"))
     try:
-        return _render_in(work, src, out_dir, name, start, end, layout, fg_h, ass, face=face)
+        return _render_in(work, src, out_dir, name, start, end, layout, fg_h, ass, face=face,
+                          branding=branding, logo=logo, second_logo=second_logo)
     finally:
         shutil.rmtree(work, ignore_errors=True)
 
 
-def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layout, fg_h, ass: str, face=None) -> dict:
+def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layout, fg_h, ass: str,
+               face=None, branding=None, logo=None, second_logo=None) -> dict:
     global _qsv_ok
     (work / f"{name}.ass").write_text(ass, encoding="utf-8")
     (work / "f").mkdir()
     for f in config.FONTS_DIR.glob("*.ttf"):
         shutil.copyfile(f, work / "f" / f.name)
-    fc = _filter(layout, fg_h, face) + f"[v0]ass={name}.ass:fontsdir=f[v]"
-    base = ["ffmpeg", "-y", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(src),
-            "-filter_complex", fc, "-map", "[v]", "-map", "0:a:0", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+    fc = _filter(layout, fg_h, face) + f"[v0]ass={name}.ass:fontsdir=f[captioned]"
+    encoder = str(Path(config.env("PEAKCUT_FFMPEG_DIR")) / "ffmpeg") if config.env("PEAKCUT_FFMPEG_DIR") else "ffmpeg"
+    base = [encoder, "-y", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(src)]
+    overlays = []
+    if branding and branding.get("enabled"):
+        overlays.append((logo, branding["position"], branding["width"], branding["opacity"], branding["background_enabled"], branding["display_duration"]))
+    if branding and branding.get("second_enabled"):
+        overlays.append((second_logo, branding["second_position"], branding["second_width"], 100, False, "entire"))
+    previous = "captioned"
+    for n, (image, position, percent, opacity, background, duration) in enumerate(overlays, 1):
+        if not image or not image.is_file():
+            raise ValueError("Branding is enabled, but a logo file is missing. Upload it again in Creator Branding.")
+        shutil.copyfile(image, work / f"logo{n}.png")
+        base += ["-i", f"logo{n}.png"]
+        pad = branding["padding"]
+        width = max(2, int(W * percent / 100))
+        height = max(2, H - 2 * pad)
+        fc += f";[{n}:v]format=rgba,scale={width}:{height}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa={opacity / 100:.3f}[logo{n}]"
+        label = f"logo{n}"
+        if background:
+            fc += f";[{label}]pad=iw+20:ih+20:10:10:color=black@0.55[backed{n}]"
+            label = f"backed{n}"
+        x = {"top_left": str(pad), "top_right": f"W-w-{pad}", "bottom_left": str(pad),
+             "bottom_right": f"W-w-{pad}", "center": "(W-w)/2"}[position]
+        y = {"top_left": str(pad), "top_right": str(pad), "bottom_left": f"H-h-{pad}",
+             "bottom_right": f"H-h-{pad}", "center": "(H-h)/2"}[position]
+        enable = ""
+        if duration == "custom":
+            a, b = branding["custom_start_time"], branding["custom_end_time"]
+            enable = f":enable='between(t,{a:.3f},{b:.3f})'"
+        output = "v" if n == len(overlays) else f"branded{n}"
+        fc += f";[{previous}][{label}]overlay={x}:{y}{enable}:format=auto[{output}]"
+        previous = output
+    if not overlays:
+        fc += ";[captioned]null[v]"
+    base += ["-filter_complex", fc, "-map", "[v]", "-map", "0:a:0", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
             "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-movflags", "+faststart", "-pix_fmt"]
     encoders = []
     if _qsv_ok is not False:
@@ -314,7 +350,7 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
     else:
         raise RuntimeError(f"Render failed: {err}")
     cover_t = min(1.2, (end - start) / 2)
-    run(["ffmpeg", "-y", "-v", "error", "-ss", f"{cover_t:.2f}", "-i", f"{name}.mp4", "-frames:v", "1",
+    run([encoder, "-y", "-v", "error", "-ss", f"{cover_t:.2f}", "-i", f"{name}.mp4", "-frames:v", "1",
          "-q:v", "3", f"{name}.jpg"], cwd=work)
     for ext in ("mp4", "jpg", "ass"):
         shutil.move(str(work / f"{name}.{ext}"), str(out_dir / f"{name}.{ext}"))

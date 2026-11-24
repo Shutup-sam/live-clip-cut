@@ -5,7 +5,7 @@ Runs against the code directly, with its own empty data folder."""
 import os, sys, tempfile
 os.environ["PEAKCUT_DATA"] = tempfile.mkdtemp(prefix="pc-games-")
 sys.path.insert(0, ".")
-from studio import brain, games, live
+from studio import brain, creators, games, live
 fails = []
 def check(n, got, want=True):
     ok = want(got) if callable(want) else got == want
@@ -95,6 +95,26 @@ with patch.object(brain, "describe", side_effect=RuntimeError("The AI did not an
 check("a hand-picked clip is made when the AI fails", len(added), 1)
 check("it is made without a hook rather than not at all", added and added[0]["hook"], "")
 check("the failure is remembered", "AI did not answer" in (s.job["ai"]["last_error"] or ""), True)
+
+# An action-first creator can use a strong reaction even when nobody says anything notable.
+s = _session("GTA 6 live")
+s.settings = {**creators.DEFAULTS, "decide_mode": "action"}
+s.job["clips"] = []
+s.t_done, s.db = 120.0, [-30.0] * 121
+added = []
+s._add_clip = added.append
+with patch.object(brain, "judge_transcript", return_value=([], 0)), \
+     patch.object(brain, "judge_signals", return_value=([{"start": 80, "end": 85, "score": 90, "reason": "loud reaction"}], 1)), \
+     patch.object(live.usage, "set_context"):
+    s._ai_check()
+check("a strong action signal makes a clip without a words score", len(added), 1)
+check("the action clip carries its game tag", "GTA6" in added[0]["hashtags"], True)
+added.clear()
+with patch.object(brain, "judge_transcript", return_value=([], 0)), \
+     patch.object(brain, "judge_signals", return_value=([{"start": 80, "end": 85, "score": 60, "reason": "minor noise"}], 1)), \
+     patch.object(live.usage, "set_context"):
+    s._ai_check()
+check("a weak sound does not make an action clip", added, [])
 
 # ---- an eight-hour stream must not keep a name for every second of it
 users, kept = {}, 0
