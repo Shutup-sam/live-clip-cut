@@ -165,3 +165,52 @@ with ctx.as_user(auth.local_user().id):
         render.W, render.H = old_size
     check("removing second logo leaves the first", c.delete(f"/api/creators/{kreek}/branding/logo2", headers=origin).status_code == 200
           and branding.get(kreek)["logo_asset_path"] != "" and branding.get(kreek)["second_enabled"] is False)
+
+    animated = creators.create({"name": "Animated"})["id"]
+    frames = [Image.new("RGBA", (40, 40), color) for color in ("red", "green")]
+    for fmt, ext, mime in (("GIF", "gif", "image/gif"), ("WEBP", "webp", "image/webp")):
+        buf = io.BytesIO()
+        frames[0].save(buf, format=fmt, save_all=True, append_images=frames[1:], duration=500, loop=0)
+        response = c.post(f"/api/creators/{animated}/branding/logo", files={"file": (f"animated.{ext}", buf.getvalue(), mime)}, headers=origin)
+        check(f"animated {ext} uploads", response.status_code == 200 and response.json()["logo_asset_path"].endswith(".gif"))
+        check(f"animated {ext} preview has correct type", c.get(f"/api/creators/{animated}/branding/logo").headers["content-type"] == "image/gif")
+    folder = Path(tempfile.mkdtemp(prefix="brand-animation-"))
+    mp4 = folder / "logo.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=red:s=40x40:r=10:d=1",
+                    "-f", "lavfi", "-i", "color=c=green:s=40x40:r=10:d=1", "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]",
+                    "-map", "[v]", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(mp4)], check=True)
+    response = c.post(f"/api/creators/{animated}/branding/logo", files={"file": ("animated.mp4", mp4.read_bytes(), "video/mp4")}, headers=origin)
+    check("short MP4 logo uploads", response.status_code == 200 and response.json()["logo_asset_path"].endswith(".mp4"))
+    check("MP4 logo preview has correct type", c.get(f"/api/creators/{animated}/branding/logo").headers["content-type"] == "video/mp4")
+    check("invalid MP4 cannot replace logo", c.post(f"/api/creators/{animated}/branding/logo",
+          files={"file": ("bad.mp4", b"not a movie", "video/mp4")}, headers=origin).status_code == 400
+          and branding.get(animated)["logo_asset_path"].endswith(".mp4"))
+    src = folder / "source.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=blue:s=180x320:r=10:d=2",
+                    "-f", "lavfi", "-i", "sine=frequency=440:duration=2", "-c:v", "libx264", "-c:a", "aac", str(src)], check=True)
+    settings = branding.save(animated, {"enabled": True, "position": "custom", "x": 50, "y": 50, "width": 30})
+    old_size = render.W, render.H
+    render.W, render.H = 180, 320
+    try:
+        out = render.render_clip(src, folder / "clips", "animated", {"start": 0.0, "end": 2.0, "hook": "", "captions": False, "layout": "crop"},
+                                 [], 180, 320, settings, branding.logo_path(animated, settings))
+    finally:
+        render.W, render.H = old_size
+    def animated_pixel(at):
+        raw = subprocess.run(["ffmpeg", "-v", "error", "-ss", str(at), "-i", str(folder / "clips" / out["file"]),
+                              "-frames:v", "1", "-f", "image2pipe", "-vcodec", "png", "-"], capture_output=True, check=True).stdout
+        return Image.open(io.BytesIO(raw)).convert("RGB").getpixel((90, 160))
+    check("MP4 logo visibly animates in exported clip", animated_pixel(.2)[0] > 120 and animated_pixel(1.2)[1] > 120)
+    for fmt, ext, mime in (("GIF", "gif", "image/gif"), ("WEBP", "webp", "image/webp")):
+        buf = io.BytesIO()
+        frames[0].save(buf, format=fmt, save_all=True, append_images=frames[1:], duration=500, loop=0)
+        branding.upload(animated, f"animated.{ext}", buf.getvalue())
+        settings = branding.get(animated)
+        render.W, render.H = 180, 320
+        try:
+            out = render.render_clip(src, folder / "clips", f"animated-{ext}", {"start": 0.0, "end": 2.0, "hook": "", "captions": False, "layout": "crop"},
+                                     [], 180, 320, settings, branding.logo_path(animated, settings))
+        finally:
+            render.W, render.H = old_size
+        reds = [animated_pixel(at)[0] for at in (.2, .7, 1.2)]
+        check(f"{ext} logo visibly animates in exported clip", max(reds) - min(reds) > 100)

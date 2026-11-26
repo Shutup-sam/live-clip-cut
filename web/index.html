@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Live Clip Cut</title>
-<link rel="icon" type="image/svg+xml" href="/brand/favicon.svg">
+<link rel="icon" type="image/svg+xml" href="/brand/favicon-live.svg">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Inter:wght@300&family=Archivo+Black&family=Anton&family=Poppins:wght@800&display=swap" rel="stylesheet">
@@ -826,7 +826,7 @@ dialog[open]{animation:fadein .16s ease}
 <body>
 <div class="app" id="app">
   <aside class="side" aria-label="Sidebar">
-    <div class="side-head"><img class="logo" src="/brand/logo-light.svg" alt="Live Clip Cut"><img class="mark" src="/brand/favicon.svg" alt="Live Clip Cut">
+    <div class="side-head"><img class="logo" src="/brand/logo-light-live.svg" alt="Live Clip Cut"><img class="mark" src="/brand/favicon-live.svg" alt="Live Clip Cut">
       <button class="icon-btn collapse" data-act="collapse" id="collapseBtn" aria-label="Collapse sidebar"></button></div>
     <nav class="nav" id="nav" aria-label="Main"></nav>
     <div class="side-foot" id="foot"></div>
@@ -1812,7 +1812,7 @@ function drawJobs() {
     list = list.filter(j => j.status !== "live"); }
   if (!list.length) {
     root.querySelectorAll("section").forEach(e => e.remove());
-    if (!$(".empty", root)) root.innerHTML = `<div class="empty"><img src="/brand/favicon.svg" alt=""><b>${cid ? "No clips for this creator yet" : "No videos yet"}</b>${cid ? "Start recording their stream, or paste a link to one of their videos above." : "Paste a link above and the studio will find the best moments and turn them into clips."}</div>`;
+    if (!$(".empty", root)) root.innerHTML = `<div class="empty"><img src="/brand/favicon-live.svg" alt=""><b>${cid ? "No clips for this creator yet" : "No videos yet"}</b>${cid ? "Start recording their stream, or paste a link to one of their videos above." : "Paste a link above and the studio will find the best moments and turn them into clips."}</div>`;
     return;
   }
   $(".empty", root)?.remove();
@@ -1878,8 +1878,8 @@ function drawCreatorForm() {
         <label class="f">Clips per video<input data-k="max_clips" type="number" value="${c.max_clips}"></label>
         <label class="f">Minutes of live stream to keep<input data-k="buffer_min" type="number" value="${c.buffer_min}"></label></div></div>
     <div class="card"><h2>Creator Branding</h2><p class="help">Burn your logo into new clips. The preview updates as you adjust it.</p>
-      <div class="brand-grid"><div><div class="brand-drop" id="branddrop" role="button" tabindex="0" aria-label="Upload creator logo">Drop a PNG, JPG or WEBP here, or <button class="btn sm" type="button" data-act="brandpick">Choose logo</button><input id="brandfile" type="file" accept="image/png,image/jpeg,image/webp" hidden></div>
-      <p class="help" style="margin:8px 0">${b.logo_asset_path ? `Logo uploaded · <button class="btn sm" type="button" data-act="brandremove">Remove logo</button>` : "No logo uploaded · maximum 5 MB"}</p>
+      <div class="brand-grid"><div><div class="brand-drop" id="branddrop" role="button" tabindex="0" aria-label="Upload creator logo">Drop a PNG, JPG, animated GIF/WEBP or short MP4 here, or <button class="btn sm" type="button" data-act="brandpick">Choose logo</button><input id="brandfile" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4" hidden></div>
+      <p class="help" style="margin:8px 0">${b.logo_asset_path ? `Logo uploaded · <button class="btn sm" type="button" data-act="brandremove">Remove logo</button>` : "No logo uploaded · maximum 5 MB, animation up to 30 seconds"}</p>
       ${b.enabled && !b.logo_asset_path ? `<p class="help" style="color:var(--bad)">Upload a logo before enabling branding.</p>` : ""}
       <div class="fields"><label class="sw span"><input data-b="enabled" type="checkbox" ${b.enabled ? "checked" : ""}>Enable logo overlay</label>
         <label class="f">Position<select data-b="position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center",custom:"Custom (drag preview)"}, b.position)}</select></label>
@@ -1893,15 +1893,15 @@ function drawCreatorForm() {
         <label class="f">Start (seconds)<input data-b="custom_start_time" type="number" min="0" step="0.1" value="${b.custom_start_time}"></label>
         <label class="f">End (seconds)<input data-b="custom_end_time" type="number" min="0" step="0.1" value="${b.custom_end_time}"></label></div>
       <h3>Second logo</h3><p class="help">Add a sponsor or another brand mark to the same clip.</p>
-      <div class="brand-drop" id="branddrop2" role="button" tabindex="0" aria-label="Upload second logo">Drop a PNG, JPG or WEBP here, or <button class="btn sm" type="button" data-act="brandpick2">Choose second logo</button><input id="brandfile2" type="file" accept="image/png,image/jpeg,image/webp" hidden></div>
-      <p class="help" style="margin:8px 0">${b.second_logo_asset_path ? `Second logo uploaded · <button class="btn sm" type="button" data-act="brandremove2">Remove second logo</button>` : "No second logo uploaded · maximum 5 MB"}</p>
+      <div class="brand-drop" id="branddrop2" role="button" tabindex="0" aria-label="Upload second logo">Drop a PNG, JPG, animated GIF/WEBP or short MP4 here, or <button class="btn sm" type="button" data-act="brandpick2">Choose second logo</button><input id="brandfile2" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4" hidden></div>
+      <p class="help" style="margin:8px 0">${b.second_logo_asset_path ? `Second logo uploaded · <button class="btn sm" type="button" data-act="brandremove2">Remove second logo</button>` : "No second logo uploaded · maximum 5 MB, animation up to 30 seconds"}</p>
       <div class="fields"><label class="sw span"><input data-b="second_enabled" type="checkbox" ${b.second_enabled ? "checked" : ""}>Enable second logo</label>
         <label class="f">Second logo position<select data-b="second_position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center",custom:"Custom (drag preview)"}, b.second_position || "bottom_right")}</select></label>
         <label class="f">Second logo width (% of video)<input data-b="second_width" type="number" min="1" max="80" value="${b.second_width || 15}"></label>
         <label class="f">Horizontal centre (%)<input data-b="second_x" type="number" min="0" max="100" value="${b.second_x ?? 50}"></label>
         <label class="f">Vertical centre (%)<input data-b="second_y" type="number" min="0" max="100" value="${b.second_y ?? 50}"></label></div>
       <button class="btn sm" type="button" data-act="brandreset">Reset to Defaults</button></div>
-      <div><div class="brand-frame" aria-label="Portrait clip branding preview" ${sample ? `style="background-image:url('/media/${encodeURIComponent(sample[0])}/${encodeURIComponent(sample[1])}')"` : ""}><div class="brand-safe"></div>${b.logo_asset_path ? `<img class="brand-logo" id="brandlogo" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo?v=${b.updated_at || 0}" alt="Creator logo preview">` : ""}${b.second_logo_asset_path ? `<img class="brand-logo" id="brandlogo2" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo2?v=${b.updated_at || 0}" alt="Second logo preview">` : ""}</div><small class="sub">Drag a logo to place it anywhere. X/Y values set its centre.</small></div></div></div>
+      <div><div class="brand-frame" aria-label="Portrait clip branding preview" ${sample ? `style="background-image:url('/media/${encodeURIComponent(sample[0])}/${encodeURIComponent(sample[1])}')"` : ""}><div class="brand-safe"></div>${b.logo_asset_path ? `${b.logo_asset_path.endsWith(".mp4") ? `<video class="brand-logo" id="brandlogo" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo?v=${b.updated_at || 0}" autoplay loop muted playsinline aria-label="Creator logo preview"></video>` : `<img class="brand-logo" id="brandlogo" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo?v=${b.updated_at || 0}" alt="Creator logo preview">`}` : ""}${b.second_logo_asset_path ? `${b.second_logo_asset_path.endsWith(".mp4") ? `<video class="brand-logo" id="brandlogo2" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo2?v=${b.updated_at || 0}" autoplay loop muted playsinline aria-label="Second logo preview"></video>` : `<img class="brand-logo" id="brandlogo2" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo2?v=${b.updated_at || 0}" alt="Second logo preview">`}` : ""}</div><small class="sub">Drag a logo to place it anywhere. X/Y values set its centre.</small></div></div></div>
     <div class="card"><h2>Posting</h2><p class="help">${A.length ? "Choose the accounts this creator's clips go to. One account can be shared by several creators." : "No accounts are connected yet. Connect one in Settings, then come back."}</p>
       ${A.length ? `<div class="row" style="margin-bottom:16px">${A.map(a => `<label class="ck"><input type="checkbox" data-acc value="${esc(a.id)}" ${c.accounts.includes(a.id) ? "checked" : ""}>${esc(a.label)} · ${esc(a.name)}</label>`).join("")}</div>` : `<button class="btn" data-act="go" data-v="settings" style="margin-bottom:16px">${ic("cog")}Open Settings</button>`}
       <div class="fields"><label class="sw span"><input type="checkbox" data-k="autopost" ${c.autopost ? "checked" : ""}><span>Post new clips automatically<small>Clips that score high enough go out without you approving them.</small></span></label>
@@ -1957,7 +1957,7 @@ async function saveCreator(quiet) {
 function drawLog() {
   const c = creator();
   put($("#clog"), c && c.log.length ? `<div class="card"><div class="log">${c.log.map(l => `<div><time>${when(l.t)}</time><span>${esc(l.msg)}</span></div>`).join("")}</div></div>`
-    : `<div class="empty"><img src="/brand/favicon.svg" alt=""><b>Nothing has happened yet</b>Recordings, clips and posts for this creator will be listed here.</div>`);
+    : `<div class="empty"><img src="/brand/favicon-live.svg" alt=""><b>Nothing has happened yet</b>Recordings, clips and posts for this creator will be listed here.</div>`);
 }
 
 /* ============================================================ overview */
@@ -2013,7 +2013,7 @@ function drawOverview() {
     <div class="card"><div class="card-head"><div><h2>Creators</h2><p class="sub">Each creator's status and results</p></div></div>
       ${o.creators.length ? `<div class="scroll"><table><tr><th>Creator</th><th>Status</th><th>Auto-post</th><th class="num">Clips today</th><th class="num">Posted today</th><th class="num">Waiting</th><th class="num">Failed</th><th class="num">Views</th><th class="num">Est. $</th></tr>
       ${o.creators.map(r => `<tr><td><a class="lnk" href="#" data-act="go" data-v="c:${esc(r.id)}">${esc(r.name)}</a></td><td>${state(r)}</td><td>${r.autopost ? `<span class="pill ok">On</span>` : `<span class="pill">Off</span>`}</td><td class="num">${r.clips_today} <span class="sub">/ ${r.clips_total}</span></td><td class="num">${r.posted_today} <span class="sub">/ ${r.posted_total}</span></td><td class="num">${r.queued}</td><td class="num">${r.failed}</td><td class="num">${r.views.toLocaleString()}</td><td class="num">${r.earnings.toFixed(2)}</td></tr>`).join("")}</table></div>`
-      : `<div class="empty"><img src="/brand/favicon.svg" alt=""><b>No creators yet</b>Add one to give each streamer their own workspace.</div>`}</div>
+      : `<div class="empty"><img src="/brand/favicon-live.svg" alt=""><b>No creators yet</b>Add one to give each streamer their own workspace.</div>`}</div>
     <div class="card"><div class="card-head"><div><h2>Post queue</h2><p class="sub">${o.paused ? "Paused. Recording and clipping carry on; nothing is posted." : "Queued clips go out at their scheduled time."}</p></div>
         <button class="btn ${o.paused ? "primary" : ""}" data-act="pause">${ic(o.paused ? "play" : "pause")}${o.paused ? "Resume posting" : "Pause all posting"}</button></div>
       ${o.posts.length ? `<div class="scroll"><table class="stack"><tr><th>When</th><th>Clip</th><th>Creator</th><th>Account</th><th class="num">Views</th><th></th></tr>
@@ -2298,7 +2298,7 @@ document.addEventListener("drop", e => { const d = e.target.closest?.("#branddro
 document.addEventListener("change", e => { if (e.target.id === "brandfile" || e.target.id === "brandfile2") { uploadBrand(e.target.files[0], e.target.id === "brandfile2"); e.target.value = ""; } });
 async function uploadBrand(file, second = false) {
   if (!file) return;
-  if (!/image\/(png|jpeg|webp)/.test(file.type) || file.size > 5*1024*1024) return toast("Choose a PNG, JPG or WEBP under 5 MB.", "bad");
+  if (!/^(image\/(png|jpeg|webp|gif)|video\/mp4)$/.test(file.type) || file.size > 5*1024*1024) return toast("Choose a PNG, JPG, GIF, WEBP or MP4 under 5 MB.", "bad");
   const id = creatorId(), form = new FormData(); form.append("file", file);
   const pending = $("#savebar")?.classList.contains("on") ? [...$$("#cform [data-k], #cform [data-b], #cform [data-acc]")].map(i => [i.value, i.checked]) : null;
   try { const b = $(second ? "#branddrop2" : "#branddrop"); b.textContent = "Uploading logo…"; const saved = await api(`/api/creators/${id}/branding/${second ? "logo2" : "logo"}`, {method:"POST",body:form}); creator().branding = saved; drawCreatorForm(); toast("Logo uploaded", "ok"); }

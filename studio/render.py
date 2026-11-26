@@ -307,12 +307,15 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
     for n, (image, position, percent, opacity, background, duration, px, py) in enumerate(overlays, 1):
         if not image or not image.is_file():
             raise ValueError("Branding is enabled, but a logo file is missing. Upload it again in Creator Branding.")
-        shutil.copyfile(image, work / f"logo{n}.png")
-        base += ["-i", f"logo{n}.png"]
+        overlay_file = f"logo{n}{image.suffix.lower()}"
+        shutil.copyfile(image, work / overlay_file)
+        if image.suffix.lower() in (".gif", ".mp4"):
+            base += ["-stream_loop", "-1"]
+        base += ["-i", overlay_file]
         pad = branding["padding"]
         width = max(2, int(W * percent / 100))
         height = max(2, H - 2 * pad)
-        fc += f";[{n}:v]format=rgba,scale={width}:{height}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa={opacity / 100:.3f}[logo{n}]"
+        fc += f";[{n}:v]setpts=PTS-STARTPTS,format=rgba,scale={width}:{height}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa={opacity / 100:.3f}[logo{n}]"
         label = f"logo{n}"
         if background:
             fc += f";[{label}]pad=iw+20:ih+20:10:10:color=black@0.55[backed{n}]"
@@ -332,7 +335,7 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
         previous = output
     if not overlays:
         fc += ";[captioned]null[v]"
-    base += ["-filter_complex", fc, "-map", "[v]", "-map", "0:a:0", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
+    base += ["-filter_complex", fc, "-map", "[v]", "-map", "0:a:0", "-t", f"{end - start:.2f}", "-af", "loudnorm=I=-14:TP=-1.5:LRA=11",
             "-c:a", "aac", "-b:a", "160k", "-ar", "48000", "-movflags", "+faststart", "-pix_fmt"]
     encoders = []
     if _qsv_ok is not False:

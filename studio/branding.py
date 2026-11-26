@@ -2,6 +2,9 @@
 import io
 import math
 import re
+import json
+import subprocess
+import tempfile
 import time
 import uuid
 from pathlib import Path
@@ -79,21 +82,66 @@ def _store(cid: str, values: dict):
 
 def upload(cid: str, filename: str, content: bytes, second: bool = False) -> dict:
     old = get(cid)
-    if Path(filename).suffix.lower() not in (".png", ".jpg", ".jpeg", ".webp") or len(content) > MAX_BYTES or not content:
-        raise ValueError("Upload a PNG, JPG or WEBP logo under 5 MB.")
-    try:
-        with Image.open(io.BytesIO(content)) as img:
-            if img.format not in ("PNG", "JPEG", "WEBP") or img.width > 4096 or img.height > 4096:
-                raise ValueError("Logo must be a PNG, JPG or WEBP under 4096 pixels per side.")
-            img.load()
-            logo = img.convert("RGBA")
-    except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
-        raise ValueError("That logo could not be opened as an image.") from e
+    ext = Path(filename).suffix.lower()
+    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4") or len(content) > MAX_BYTES or not content:
+        raise ValueError("Upload a PNG, JPG, GIF, WEBP or MP4 logo under 5 MB.")
+    if ext == ".mp4":
+        with tempfile.NamedTemporaryFile(suffix=".mp4") as sample:
+            sample.write(content)
+            sample.flush()
+            try:
+                out = subprocess.run(["ffprobe", "-v", "error", "-show_streams", "-show_format", "-of", "json", sample.name],
+                                     capture_output=True, text=True, timeout=15, check=True)
+                info = json.loads(out.stdout)
+                video = next(s for s in info["streams"] if s["codec_type"] == "video")
+                duration = float(info["format"]["duration"])
+                if ("mp4" not in info["format"].get("format_name", "") or not 0 < duration <= 30
+                        or not 0 < int(video["width"]) <= 4096 or not 0 < int(video["height"]) <= 4096):
+                    raise ValueError("MP4 logo must be at most 30 seconds and 4096 pixels per side.")
+            except (subprocess.SubprocessError, OSError, KeyError, StopIteration, ValueError) as e:
+                raise ValueError("That MP4 logo could not be opened, or exceeds 30 seconds.") from e
+        saved = content
+    else:
+        try:
+            with Image.open(io.BytesIO(content)) as img:
+                if img.format not in ("PNG", "JPEG", "WEBP", "GIF") or img.width > 4096 or img.height > 4096:
+                    raise ValueError("Logo must be under 4096 pixels per side.")
+                frames = getattr(img, "n_frames", 1)
+                if frames > 150 or frames * img.width * img.height > 20_000_000:
+                    raise ValueError("Animated logo has too many frames or pixels.")
+                if frames > 1:
+                    duration = 0
+                    pictures = []
+                    delays = []
+                    for frame in range(frames):
+                        img.seek(frame)
+                        delay = max(20, img.info.get("duration", 100))
+                        duration += delay
+                        if img.format == "WEBP":
+                            pictures.append(img.convert("RGBA").copy())
+                            delays.append(delay)
+                    if duration > 30000:
+                        raise ValueError("Animated logos can be at most 30 seconds long.")
+                    if img.format == "WEBP":
+                        buffer = io.BytesIO()
+                        pictures[0].save(buffer, "GIF", save_all=True, append_images=pictures[1:], duration=delays, loop=0)
+                        saved = buffer.getvalue()
+                        ext = ".gif"
+                    else:
+                        saved = content
+                else:
+                    img.load()
+                    buffer = io.BytesIO()
+                    img.convert("RGBA").save(buffer, "PNG")
+                    saved = buffer.getvalue()
+                    ext = ".png"
+        except (UnidentifiedImageError, OSError, Image.DecompressionBombError) as e:
+            raise ValueError("That logo could not be opened as an image.") from e
     folder = creators.root(cid) / "branding"
     folder.mkdir(parents=True, exist_ok=True)
-    name = f"logo-{uuid.uuid4().hex}.png"
+    name = f"logo-{uuid.uuid4().hex}{ext}"
     target = folder / name
-    logo.save(target, "PNG")
+    target.write_bytes(saved)
     try:
         _store(cid, {**old, ("second_logo_asset_path" if second else "logo_asset_path"): name})
     except Exception:
@@ -111,6 +159,6 @@ def remove(cid: str, second: bool = False) -> dict:
 
 def logo_path(cid: str, settings: dict, second: bool = False) -> Path | None:
     name = settings.get("second_logo_asset_path" if second else "logo_asset_path") or ""
-    if not re.fullmatch(r"logo-[0-9a-f]{32}\.png", name):
+    if not re.fullmatch(r"logo-[0-9a-f]{32}\.(png|gif|webp|mp4)", name):
         return None
     return creators.root(cid) / "branding" / name

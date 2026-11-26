@@ -424,7 +424,7 @@ def asset(name: str):
 
 @app.get("/favicon.ico")
 def favicon():
-    return RedirectResponse("/brand/favicon.svg", 308)
+    return RedirectResponse("/brand/favicon-live.svg", 308)
 
 
 # ================================================================ sign up, sign in, sign out
@@ -1259,7 +1259,7 @@ def branding_logo(cid: str):
     path = branding.logo_path(cid, settings)
     if not path or not path.is_file():
         raise HTTPException(404, "No logo uploaded")
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, no-store"})
+    return FileResponse(path, media_type={".gif":"image/gif", ".webp":"image/webp", ".mp4":"video/mp4"}.get(path.suffix, "image/png"), headers={"Cache-Control": "private, no-store"})
 
 
 @app.get("/api/creators/{cid}/branding/logo2")
@@ -1271,7 +1271,7 @@ def branding_logo_second(cid: str):
     path = branding.logo_path(cid, settings, second=True)
     if not path or not path.is_file():
         raise HTTPException(404, "No second logo uploaded")
-    return FileResponse(path, media_type="image/png", headers={"Cache-Control": "private, no-store"})
+    return FileResponse(path, media_type={".gif":"image/gif", ".webp":"image/webp", ".mp4":"video/mp4"}.get(path.suffix, "image/png"), headers={"Cache-Control": "private, no-store"})
 
 
 @app.post("/api/creators/{cid}/live")
