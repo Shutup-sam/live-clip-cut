@@ -159,6 +159,20 @@ dialog::backdrop{background:rgba(14,12,11,.42)}
 .fbtop b{color:var(--brand-ink)}
 .fbmsg{white-space:pre-wrap;color:var(--text);line-height:1.6;margin:0 0 10px}
 .fbctx{font-size:12px;color:var(--dim);background:var(--muted);border-radius:8px;padding:8px 10px;margin:0 0 12px;overflow-wrap:anywhere}
+/* Match the creator studio without changing admin behavior. */
+.side{background:radial-gradient(circle at 0 0,rgba(245,139,61,.11),transparent 42%),linear-gradient(155deg,#24211e,#171615 70%)}
+.nav-item{min-height:42px;border-radius:11px}
+.nav-item.on{background:rgba(245,139,61,.16);color:#ffd1ad;box-shadow:inset 3px 0 0 var(--brand)}
+.nav-item.on svg,.nav-item.on .count{color:#ffd1ad}
+main{background:#f8f7f4;border-radius:22px}
+.topbar{background:rgba(248,247,244,.94);backdrop-filter:blur(14px)}
+.card,.tile{border-color:#e9e5df;border-radius:16px;box-shadow:0 8px 24px rgba(37,31,25,.035)}
+.tile{min-height:132px}
+.tile b{color:#211f1c}
+.card-head h2{font-size:16px;color:#211f1c}
+.btn.primary,.seg button.on{background:#f58b3d;border-color:#f58b3d;color:#241b16}
+input:focus,textarea:focus{box-shadow:0 0 0 3px rgba(245,139,61,.16)}
+@media (max-width:900px){main{border-radius:18px}.nav-item{min-height:44px}}
 </style>
 </head>
 <body>
