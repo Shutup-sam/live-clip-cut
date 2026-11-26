@@ -300,11 +300,11 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
     base = [encoder, "-y", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(src)]
     overlays = []
     if branding and branding.get("enabled"):
-        overlays.append((logo, branding["position"], branding["width"], branding["opacity"], branding["background_enabled"], branding["display_duration"]))
+        overlays.append((logo, branding["position"], branding["width"], branding["opacity"], branding["background_enabled"], branding["display_duration"], branding["x"], branding["y"]))
     if branding and branding.get("second_enabled"):
-        overlays.append((second_logo, branding["second_position"], branding["second_width"], 100, False, "entire"))
+        overlays.append((second_logo, branding["second_position"], branding["second_width"], 100, False, "entire", branding["second_x"], branding["second_y"]))
     previous = "captioned"
-    for n, (image, position, percent, opacity, background, duration) in enumerate(overlays, 1):
+    for n, (image, position, percent, opacity, background, duration, px, py) in enumerate(overlays, 1):
         if not image or not image.is_file():
             raise ValueError("Branding is enabled, but a logo file is missing. Upload it again in Creator Branding.")
         shutil.copyfile(image, work / f"logo{n}.png")
@@ -318,9 +318,11 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
             fc += f";[{label}]pad=iw+20:ih+20:10:10:color=black@0.55[backed{n}]"
             label = f"backed{n}"
         x = {"top_left": str(pad), "top_right": f"W-w-{pad}", "bottom_left": str(pad),
-             "bottom_right": f"W-w-{pad}", "center": "(W-w)/2"}[position]
+             "bottom_right": f"W-w-{pad}", "center": "(W-w)/2",
+             "custom": f"'max(0,min(W-w,W*{px}/100-w/2))'"}[position]
         y = {"top_left": str(pad), "top_right": str(pad), "bottom_left": f"H-h-{pad}",
-             "bottom_right": f"H-h-{pad}", "center": "(H-h)/2"}[position]
+             "bottom_right": f"H-h-{pad}", "center": "(H-h)/2",
+             "custom": f"'max(0,min(H-h,H*{py}/100-h/2))'"}[position]
         enable = ""
         if duration == "custom":
             a, b = branding["custom_start_time"], branding["custom_end_time"]

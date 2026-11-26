@@ -42,6 +42,10 @@ creator_branding = sa.Table(
     sa.Column("second_enabled", sa.Boolean, nullable=False, server_default=sa.false()),
     sa.Column("second_position", sa.String(20), nullable=False, server_default="bottom_right"),
     sa.Column("second_width", sa.Integer, nullable=False, server_default="15"),
+    sa.Column("x", sa.Integer, nullable=False, server_default="50"),
+    sa.Column("y", sa.Integer, nullable=False, server_default="50"),
+    sa.Column("second_x", sa.Integer, nullable=False, server_default="50"),
+    sa.Column("second_y", sa.Integer, nullable=False, server_default="50"),
     sa.Column("updated_at", sa.Float, nullable=False),
 )
 
@@ -139,7 +143,9 @@ def init():
     additions = {"second_logo_asset_path": "VARCHAR(100) NOT NULL DEFAULT ''",
                  "second_enabled": "BOOLEAN NOT NULL DEFAULT FALSE",
                  "second_position": "VARCHAR(20) NOT NULL DEFAULT 'bottom_right'",
-                 "second_width": "INTEGER NOT NULL DEFAULT 15"}
+                 "second_width": "INTEGER NOT NULL DEFAULT 15",
+                 "x": "INTEGER NOT NULL DEFAULT 50", "y": "INTEGER NOT NULL DEFAULT 50",
+                 "second_x": "INTEGER NOT NULL DEFAULT 50", "second_y": "INTEGER NOT NULL DEFAULT 50"}
     with engine.begin() as conn:
         for name, definition in additions.items():
             if name not in columns:

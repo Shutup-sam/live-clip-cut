@@ -12,9 +12,11 @@ from PIL import Image, UnidentifiedImageError
 from . import creators, ctx, db
 
 DEFAULTS = {"logo_asset_path": "", "enabled": False, "position": "top_right", "width": 20,
+            "x": 50, "y": 50,
             "opacity": 100, "padding": 24, "background_enabled": False, "display_duration": "entire",
             "custom_start_time": 0.0, "custom_end_time": 0.0,
-            "second_logo_asset_path": "", "second_enabled": False, "second_position": "bottom_right", "second_width": 15}
+            "second_logo_asset_path": "", "second_enabled": False, "second_position": "bottom_right", "second_width": 15,
+            "second_x": 50, "second_y": 50}
 MAX_BYTES = 5 * 1024 * 1024
 
 
@@ -32,13 +34,14 @@ def save(cid: str, changes: dict) -> dict:
     if not isinstance(changes, dict) or any(k not in DEFAULTS or k in ("logo_asset_path", "second_logo_asset_path") for k in changes):
         raise ValueError("Invalid branding setting.")
     new = {**old, **changes}
-    if new["position"] not in ("top_left", "top_right", "bottom_left", "bottom_right", "center"):
+    if new["position"] not in ("top_left", "top_right", "bottom_left", "bottom_right", "center", "custom"):
         raise ValueError("Choose a logo position.")
-    if new["second_position"] not in ("top_left", "top_right", "bottom_left", "bottom_right", "center"):
+    if new["second_position"] not in ("top_left", "top_right", "bottom_left", "bottom_right", "center", "custom"):
         raise ValueError("Choose a second logo position.")
     if new["display_duration"] not in ("entire", "custom"):
         raise ValueError("Choose a display duration.")
-    for k, lo, hi in (("width", 1, 80), ("second_width", 1, 80), ("opacity", 0, 100), ("padding", 0, 300)):
+    for k, lo, hi in (("width", 1, 80), ("second_width", 1, 80), ("opacity", 0, 100), ("padding", 0, 300),
+                      ("x", 0, 100), ("y", 0, 100), ("second_x", 0, 100), ("second_y", 0, 100)):
         try:
             new[k] = int(new[k])
         except (TypeError, ValueError):

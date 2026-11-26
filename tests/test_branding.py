@@ -29,8 +29,8 @@ with db.engine.begin() as conn:
     conn.execute(sa.text("INSERT INTO creator_branding (user_id, creator_id, logo_asset_path, updated_at) VALUES ('legacy', 'legacy', 'logo-keep.png', 1)"))
 db.init()
 with db.engine.begin() as conn:
-    old = conn.execute(sa.text("SELECT logo_asset_path, second_enabled, second_position FROM creator_branding WHERE user_id='legacy'")).one()
-assert old == ("logo-keep.png", 0, "bottom_right")
+    old = conn.execute(sa.text("SELECT logo_asset_path, second_enabled, second_position, x, y, second_x, second_y FROM creator_branding WHERE user_id='legacy'")).one()
+assert old == ("logo-keep.png", 0, "bottom_right", 50, 50, 50, 50)
 c = TestClient(server.app, base_url="http://127.0.0.1:8765")
 origin = {"Origin": "http://127.0.0.1:8765"}
 
@@ -76,6 +76,11 @@ with ctx.as_user(auth.local_user().id):
     check("logo path cannot be set by clients", c.put(f"/api/creators/{kreek}/branding", json={"logo_asset_path": "other.png"}, headers=origin).status_code == 400)
     check("second logo path cannot be set by clients", c.put(f"/api/creators/{kreek}/branding", json={"second_logo_asset_path": "other.png"}, headers=origin).status_code == 400)
     check("invalid second position rejected", c.put(f"/api/creators/{kreek}/branding", json={"second_position": "../../etc"}, headers=origin).status_code == 400)
+    check("custom coordinates save", c.put(f"/api/creators/{kreek}/branding", json={"position":"custom", "x":80, "y":30,
+          "second_position":"custom", "second_x":20, "second_y":75}, headers=origin).json()["x"] == 80)
+    check("out-of-frame coordinates rejected", c.put(f"/api/creators/{kreek}/branding", json={"x":101}, headers=origin).status_code == 400)
+    check("old preset settings still save", c.put(f"/api/creators/{kreek}/branding", json={"position":"top_left",
+          "second_position":"bottom_right"}, headers=origin).status_code == 200)
     try:
         posting._require_branding({"creator": kreek}, {"status": "done"})
     except ValueError:
@@ -104,6 +109,16 @@ with ctx.as_user(auth.local_user().id):
                                      [], *size, branding.get(kreek), branding.logo_path(kreek, branding.get(kreek)),
                                      branding.logo_path(kreek, branding.get(kreek), second=True))
             if size == (320, 180):
+                custom_place = {**branding.get(kreek), "position":"custom", "x":80, "y":30,
+                                "second_position":"custom", "second_x":20, "second_y":75,
+                                "width":20, "second_width":15}
+                moved = render.render_clip(src, folder / "clips", "moved", {"start":0.0, "end":2.0, "hook":"", "captions":False, "layout":"crop"},
+                                           [], *size, custom_place, branding.logo_path(kreek, custom_place),
+                                           branding.logo_path(kreek, custom_place, second=True))
+                check("custom first logo appears at its X/Y position",
+                      Image.open(folder / "clips" / moved["cover"]).convert("RGB").getpixel((144, 96))[0] > 150)
+                check("custom second logo appears at its X/Y position",
+                      Image.open(folder / "clips" / moved["cover"]).convert("RGB").getpixel((36, 240))[1] > 150)
                 second_only = {**branding.get(kreek), "enabled": False}
                 solo = render.render_clip(src, folder / "clips", "second_only", {"start": 0.0, "end": 2.0, "hook": "", "captions": False, "layout": "crop"},
                                           [], *size, second_only, None, branding.logo_path(kreek, second_only, second=True))

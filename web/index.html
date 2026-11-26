@@ -498,7 +498,8 @@ img.av{object-fit:cover}
 .brand-drop.over{border-color:var(--brand);background:var(--brand-soft)}
 .brand-frame{position:relative;width:180px;aspect-ratio:9/16;background:linear-gradient(150deg,#25211e,#625046 55%,#231c19) center/cover;border-radius:10px;overflow:hidden}
 .brand-safe{position:absolute;inset:5%;border:1px dashed #ffffff80;pointer-events:none}
-.brand-logo{position:absolute;width:20%;height:auto;max-height:100%;object-fit:contain;pointer-events:none}
+.brand-logo{position:absolute;width:20%;height:auto;max-height:100%;object-fit:contain;cursor:grab;touch-action:none;user-select:none}
+.brand-logo:active{cursor:grabbing}
 .brand-logo.back{background:#0008;padding:2px;border-radius:3px}
 @media(max-width:700px){.brand-grid{grid-template-columns:1fr}.brand-frame{margin:auto}}
 .step .n{width:26px;height:26px;border-radius:999px;border:1px solid var(--line-2);background:#fff;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none;color:var(--brand-ink)}
@@ -1569,7 +1570,7 @@ function onLink(input) {
   linkTimer = setTimeout(() => { if (input.value.trim() === u) takeLink(A, u, input); }, 900);   // other link shapes: take it once typing stops
 }
 document.addEventListener("input", e => { if (e.target.id === "url") onLink(e.target);
-  if (e.target.closest?.("#cform") && e.target.dataset.b) { dirty(true); updateBrandPreview(); }
+  if (e.target.closest?.("#cform") && e.target.dataset.b) { if (["x","y","second_x","second_y"].includes(e.target.dataset.b)) $(`#cform [data-b="${e.target.dataset.b.startsWith("second_") ? "second_" : ""}position"]`).value = "custom"; dirty(true); updateBrandPreview(); }
   if (e.target.closest?.("#cform") && e.target.dataset.k && !/checkbox|radio/.test(e.target.type)) dirty(true); });
 document.addEventListener("keydown", e => { if (e.target.id === "url" && e.key === "Enter" && e.target.value.trim() && looksLink(e.target.value.trim())) { e.preventDefault(); clearTimeout(linkTimer); takeLink(att(), e.target.value.trim(), e.target); } });
 document.addEventListener("keydown", e => { if (e.target.id === "branddrop" && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); $("#brandfile").click(); } });
@@ -1881,8 +1882,10 @@ function drawCreatorForm() {
       <p class="help" style="margin:8px 0">${b.logo_asset_path ? `Logo uploaded · <button class="btn sm" type="button" data-act="brandremove">Remove logo</button>` : "No logo uploaded · maximum 5 MB"}</p>
       ${b.enabled && !b.logo_asset_path ? `<p class="help" style="color:var(--bad)">Upload a logo before enabling branding.</p>` : ""}
       <div class="fields"><label class="sw span"><input data-b="enabled" type="checkbox" ${b.enabled ? "checked" : ""}>Enable logo overlay</label>
-        <label class="f">Position<select data-b="position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center"}, b.position)}</select></label>
-        <label class="f">Logo width (% of video)<input data-b="width" type="range" min="1" max="80" value="${b.width}"></label>
+        <label class="f">Position<select data-b="position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center",custom:"Custom (drag preview)"}, b.position)}</select></label>
+        <label class="f">Logo width (% of video)<input data-b="width" type="number" min="1" max="80" value="${b.width}"></label>
+        <label class="f">Horizontal centre (%)<input data-b="x" type="number" min="0" max="100" value="${b.x ?? 50}"></label>
+        <label class="f">Vertical centre (%)<input data-b="y" type="number" min="0" max="100" value="${b.y ?? 50}"></label>
         <label class="f">Opacity (%)<input data-b="opacity" type="range" min="0" max="100" value="${b.opacity}"></label>
         <label class="f">Padding (pixels)<input data-b="padding" type="number" min="0" max="300" value="${b.padding}"></label>
         <label class="sw span"><input data-b="background_enabled" type="checkbox" ${b.background_enabled ? "checked" : ""}>Add dark background behind logo</label>
@@ -1893,10 +1896,12 @@ function drawCreatorForm() {
       <div class="brand-drop" id="branddrop2" role="button" tabindex="0" aria-label="Upload second logo">Drop a PNG, JPG or WEBP here, or <button class="btn sm" type="button" data-act="brandpick2">Choose second logo</button><input id="brandfile2" type="file" accept="image/png,image/jpeg,image/webp" hidden></div>
       <p class="help" style="margin:8px 0">${b.second_logo_asset_path ? `Second logo uploaded · <button class="btn sm" type="button" data-act="brandremove2">Remove second logo</button>` : "No second logo uploaded · maximum 5 MB"}</p>
       <div class="fields"><label class="sw span"><input data-b="second_enabled" type="checkbox" ${b.second_enabled ? "checked" : ""}>Enable second logo</label>
-        <label class="f">Second logo position<select data-b="second_position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center"}, b.second_position || "bottom_right")}</select></label>
-        <label class="f">Second logo width (% of video)<input data-b="second_width" type="range" min="1" max="80" value="${b.second_width || 15}"></label></div>
+        <label class="f">Second logo position<select data-b="second_position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center",custom:"Custom (drag preview)"}, b.second_position || "bottom_right")}</select></label>
+        <label class="f">Second logo width (% of video)<input data-b="second_width" type="number" min="1" max="80" value="${b.second_width || 15}"></label>
+        <label class="f">Horizontal centre (%)<input data-b="second_x" type="number" min="0" max="100" value="${b.second_x ?? 50}"></label>
+        <label class="f">Vertical centre (%)<input data-b="second_y" type="number" min="0" max="100" value="${b.second_y ?? 50}"></label></div>
       <button class="btn sm" type="button" data-act="brandreset">Reset to Defaults</button></div>
-      <div><div class="brand-frame" aria-label="Portrait clip branding preview" ${sample ? `style="background-image:url('/media/${encodeURIComponent(sample[0])}/${encodeURIComponent(sample[1])}')"` : ""}><div class="brand-safe"></div>${b.logo_asset_path ? `<img class="brand-logo" id="brandlogo" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo?v=${b.updated_at || 0}" alt="Creator logo preview">` : ""}${b.second_logo_asset_path ? `<img class="brand-logo" id="brandlogo2" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo2?v=${b.updated_at || 0}" alt="Second logo preview">` : ""}</div><small class="sub">Dashed line shows the safe margin.</small></div></div></div>
+      <div><div class="brand-frame" aria-label="Portrait clip branding preview" ${sample ? `style="background-image:url('/media/${encodeURIComponent(sample[0])}/${encodeURIComponent(sample[1])}')"` : ""}><div class="brand-safe"></div>${b.logo_asset_path ? `<img class="brand-logo" id="brandlogo" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo?v=${b.updated_at || 0}" alt="Creator logo preview">` : ""}${b.second_logo_asset_path ? `<img class="brand-logo" id="brandlogo2" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo2?v=${b.updated_at || 0}" alt="Second logo preview">` : ""}</div><small class="sub">Drag a logo to place it anywhere. X/Y values set its centre.</small></div></div></div>
     <div class="card"><h2>Posting</h2><p class="help">${A.length ? "Choose the accounts this creator's clips go to. One account can be shared by several creators." : "No accounts are connected yet. Connect one in Settings, then come back."}</p>
       ${A.length ? `<div class="row" style="margin-bottom:16px">${A.map(a => `<label class="ck"><input type="checkbox" data-acc value="${esc(a.id)}" ${c.accounts.includes(a.id) ? "checked" : ""}>${esc(a.label)} · ${esc(a.name)}</label>`).join("")}</div>` : `<button class="btn" data-act="go" data-v="settings" style="margin-bottom:16px">${ic("cog")}Open Settings</button>`}
       <div class="fields"><label class="sw span"><input type="checkbox" data-k="autopost" ${c.autopost ? "checked" : ""}><span>Post new clips automatically<small>Clips that score high enough go out without you approving them.</small></span></label>
@@ -1916,12 +1921,34 @@ const brandingForm = () => { const d = {}; $$("#cform [data-b]").forEach(i => d[
 function updateBrandPreview() {
   const frame = $(".brand-frame"), form = $("#cform"); if (!frame || !form) return;
   const b = brandingForm(), p = Math.min(45, b.padding / 1080 * 100);
-  for (const [id, position, width, opacity, enabled, background] of [["#brandlogo", b.position, b.width, b.opacity, b.enabled, b.background_enabled], ["#brandlogo2", b.second_position, b.second_width, 100, b.second_enabled, false]]) {
+  for (const [id, position, width, opacity, enabled, background, x, y] of [["#brandlogo", b.position, b.width, b.opacity, b.enabled, b.background_enabled, b.x, b.y], ["#brandlogo2", b.second_position, b.second_width, 100, b.second_enabled, false, b.second_x, b.second_y]]) {
     const img = $(id); if (!img) continue;
-    Object.assign(img.style, {width:`${width}%`, maxWidth:`${100 - 2*p}%`, maxHeight:`${100 - 2*p}%`, opacity:enabled ? opacity/100 : 0.35, left:position.includes("left") ? `${p}%` : position.includes("right") ? "auto" : "50%", right:position.includes("right") ? `${p}%` : "auto", top:position.startsWith("top") ? `${p}%` : position.startsWith("bottom") ? "auto" : "50%", bottom:position.startsWith("bottom") ? `${p}%` : "auto", transform:position === "center" ? "translate(-50%,-50%)" : "none"});
+    Object.assign(img.style, {width:`${width}%`, maxWidth:`${100 - 2*p}%`, maxHeight:`${100 - 2*p}%`, opacity:enabled ? opacity/100 : 0.35, left:position === "custom" ? `${x}%` : position.includes("left") ? `${p}%` : position.includes("right") ? "auto" : "50%", right:position.includes("right") ? `${p}%` : "auto", top:position === "custom" ? `${y}%` : position.startsWith("top") ? `${p}%` : position.startsWith("bottom") ? "auto" : "50%", bottom:position.startsWith("bottom") ? `${p}%` : "auto", transform:position === "center" || position === "custom" ? "translate(-50%,-50%)" : "none"});
     img.classList.toggle("back", background);
+    if (position === "custom") requestAnimationFrame(() => {
+      const box = img.parentElement;
+      img.style.left = `${Math.max(img.offsetWidth / 2, Math.min(box.clientWidth - img.offsetWidth / 2, box.clientWidth * x / 100))}px`;
+      img.style.top = `${Math.max(img.offsetHeight / 2, Math.min(box.clientHeight - img.offsetHeight / 2, box.clientHeight * y / 100))}px`;
+    });
   }
 }
+document.addEventListener("pointerdown", e => {
+  const img = e.target.closest?.(".brand-frame .brand-logo"); if (!img) return;
+  const second = img.id === "brandlogo2", prefix = second ? "second_" : "";
+  img.setPointerCapture(e.pointerId); e.preventDefault();
+  const move = ev => {
+    const rect = img.parentElement.getBoundingClientRect();
+    const x = Math.max(0, Math.min(100, Math.round((ev.clientX - rect.left) / rect.width * 100)));
+    const y = Math.max(0, Math.min(100, Math.round((ev.clientY - rect.top) / rect.height * 100)));
+    $(`#cform [data-b="${prefix}position"]`).value = "custom";
+    $(`#cform [data-b="${prefix}x"]`).value = x;
+    $(`#cform [data-b="${prefix}y"]`).value = y;
+    dirty(true); updateBrandPreview();
+  };
+  move(e); img.addEventListener("pointermove", move);
+  img.addEventListener("pointerup", () => img.removeEventListener("pointermove", move), {once:true});
+  img.addEventListener("pointercancel", () => img.removeEventListener("pointermove", move), {once:true});
+});
 const dirty = on => $("#savebar")?.classList.toggle("on", on);
 async function saveCreator(quiet) {
   try { await send(`/api/creators/${creatorId()}/branding`, brandingForm(), "PUT"); await send(`/api/creators/${creatorId()}`, creatorForm(), "PUT"); dirty(false); if (!quiet) toast("Saved", "ok"); await tick(); return true; }
@@ -2508,7 +2535,7 @@ document.addEventListener("click", async e => {
     if (a === "brandpick2") { $("#brandfile2").click(); return; }
     if (a === "brandremove") { const saved = await api(`/api/creators/${creatorId()}/branding/logo`, {method:"DELETE"}); creator().branding = saved; drawCreatorForm(); return toast("Logo removed", "ok"); }
     if (a === "brandremove2") { const saved = await api(`/api/creators/${creatorId()}/branding/logo2`, {method:"DELETE"}); creator().branding = saved; drawCreatorForm(); return toast("Second logo removed", "ok"); }
-    if (a === "brandreset") { await api(`/api/creators/${creatorId()}/branding/logo`, {method:"DELETE"}); await api(`/api/creators/${creatorId()}/branding/logo2`, {method:"DELETE"}); creator().branding = await send(`/api/creators/${creatorId()}/branding`, {enabled:false,position:"top_right",width:20,opacity:100,padding:24,background_enabled:false,display_duration:"entire",custom_start_time:0,custom_end_time:0,second_enabled:false,second_position:"bottom_right",second_width:15}, "PUT"); drawCreatorForm(); return toast("Branding reset", "ok"); }
+    if (a === "brandreset") { await api(`/api/creators/${creatorId()}/branding/logo`, {method:"DELETE"}); await api(`/api/creators/${creatorId()}/branding/logo2`, {method:"DELETE"}); creator().branding = await send(`/api/creators/${creatorId()}/branding`, {enabled:false,position:"top_right",width:20,x:50,y:50,opacity:100,padding:24,background_enabled:false,display_duration:"entire",custom_start_time:0,custom_end_time:0,second_enabled:false,second_position:"bottom_right",second_width:15,second_x:50,second_y:50}, "PUT"); drawCreatorForm(); return toast("Branding reset", "ok"); }
     if (a === "pause") { await send("/api/settings", {paused:!S.overview.paused}, "PUT"); return loadOverview(); }
     if (a === "pcancel" || a === "pretry") { await api(`/api/posts/${d.id}/${a === "pcancel" ? "cancel" : "retry"}`, {method:"POST"}); return loadOverview(); }
     if (a === "ssave") { await saveSettings(); toast("Saved", "ok"); return drawSettings(); }
