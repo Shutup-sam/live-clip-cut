@@ -46,6 +46,8 @@ creator_branding = sa.Table(
     sa.Column("y", sa.Integer, nullable=False, server_default="50"),
     sa.Column("second_x", sa.Integer, nullable=False, server_default="50"),
     sa.Column("second_y", sa.Integer, nullable=False, server_default="50"),
+    sa.Column("remove_black", sa.Boolean, nullable=False, server_default=sa.false()),
+    sa.Column("second_remove_black", sa.Boolean, nullable=False, server_default=sa.false()),
     sa.Column("updated_at", sa.Float, nullable=False),
 )
 
@@ -145,7 +147,8 @@ def init():
                  "second_position": "VARCHAR(20) NOT NULL DEFAULT 'bottom_right'",
                  "second_width": "INTEGER NOT NULL DEFAULT 15",
                  "x": "INTEGER NOT NULL DEFAULT 50", "y": "INTEGER NOT NULL DEFAULT 50",
-                 "second_x": "INTEGER NOT NULL DEFAULT 50", "second_y": "INTEGER NOT NULL DEFAULT 50"}
+                 "second_x": "INTEGER NOT NULL DEFAULT 50", "second_y": "INTEGER NOT NULL DEFAULT 50",
+                 "remove_black": "BOOLEAN NOT NULL DEFAULT FALSE", "second_remove_black": "BOOLEAN NOT NULL DEFAULT FALSE"}
     with engine.begin() as conn:
         for name, definition in additions.items():
             if name not in columns:

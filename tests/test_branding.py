@@ -29,8 +29,8 @@ with db.engine.begin() as conn:
     conn.execute(sa.text("INSERT INTO creator_branding (user_id, creator_id, logo_asset_path, updated_at) VALUES ('legacy', 'legacy', 'logo-keep.png', 1)"))
 db.init()
 with db.engine.begin() as conn:
-    old = conn.execute(sa.text("SELECT logo_asset_path, second_enabled, second_position, x, y, second_x, second_y FROM creator_branding WHERE user_id='legacy'")).one()
-assert old == ("logo-keep.png", 0, "bottom_right", 50, 50, 50, 50)
+    old = conn.execute(sa.text("SELECT logo_asset_path, second_enabled, second_position, x, y, second_x, second_y, remove_black, second_remove_black FROM creator_branding WHERE user_id='legacy'")).one()
+assert old == ("logo-keep.png", 0, "bottom_right", 50, 50, 50, 50, 0, 0)
 c = TestClient(server.app, base_url="http://127.0.0.1:8765")
 origin = {"Origin": "http://127.0.0.1:8765"}
 
@@ -180,7 +180,7 @@ with ctx.as_user(auth.local_user().id):
                     "-f", "lavfi", "-i", "color=c=green:s=40x40:r=10:d=1", "-filter_complex", "[0:v][1:v]concat=n=2:v=1:a=0[v]",
                     "-map", "[v]", "-c:v", "libx264", "-pix_fmt", "yuv420p", str(mp4)], check=True)
     response = c.post(f"/api/creators/{animated}/branding/logo", files={"file": ("animated.mp4", mp4.read_bytes(), "video/mp4")}, headers=origin)
-    check("short MP4 logo uploads", response.status_code == 200 and response.json()["logo_asset_path"].endswith(".mp4"))
+    check("short MP4 logo uploads", response.status_code == 200 and response.json()["logo_asset_path"].endswith(".mp4") and response.json()["remove_black"])
     check("MP4 logo preview has correct type", c.get(f"/api/creators/{animated}/branding/logo").headers["content-type"] == "video/mp4")
     check("invalid MP4 cannot replace logo", c.post(f"/api/creators/{animated}/branding/logo",
           files={"file": ("bad.mp4", b"not a movie", "video/mp4")}, headers=origin).status_code == 400
@@ -214,3 +214,19 @@ with ctx.as_user(auth.local_user().id):
             render.W, render.H = old_size
         reds = [animated_pixel(at)[0] for at in (.2, .7, 1.2)]
         check(f"{ext} logo visibly animates in exported clip", max(reds) - min(reds) > 100)
+
+    black = folder / "black.mp4"
+    subprocess.run(["ffmpeg", "-y", "-loglevel", "error", "-f", "lavfi", "-i", "color=c=black:s=40x40:r=10:d=2",
+                    "-vf", "drawbox=x=12:y=12:w=16:h=16:color=red:t=fill", "-c:v", "libx264", str(black)], check=True)
+    branding.upload(animated, "black.mp4", black.read_bytes())
+    settings = branding.get(animated)
+    render.W, render.H = 180, 320
+    try:
+        out = render.render_clip(src, folder / "clips", "black-keyed", {"start": 0.0, "end": 2.0, "hook": "", "captions": False, "layout": "crop"},
+                                 [], 180, 320, settings, branding.logo_path(animated, settings))
+    finally:
+        render.W, render.H = old_size
+    raw = subprocess.run(["ffmpeg", "-v", "error", "-i", str(folder / "clips" / out["file"]), "-frames:v", "1",
+                          "-f", "image2pipe", "-vcodec", "png", "-"], capture_output=True, check=True).stdout
+    frame = Image.open(io.BytesIO(raw)).convert("RGB")
+    check("black canvas is transparent but logo remains", frame.getpixel((66, 140))[2] > 100 and frame.getpixel((90, 160))[0] > 120)

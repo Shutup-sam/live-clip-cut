@@ -15,12 +15,12 @@ from PIL import Image, UnidentifiedImageError
 from . import creators, ctx, db
 
 DEFAULTS = {"logo_asset_path": "", "enabled": False, "position": "top_right", "width": 20,
-            "x": 50, "y": 50,
+            "x": 50, "y": 50, "remove_black": False,
             "opacity": 100, "padding": 24, "background_enabled": False, "display_duration": "entire",
             "custom_start_time": 0.0, "custom_end_time": 0.0,
             "second_logo_asset_path": "", "second_enabled": False, "second_position": "bottom_right", "second_width": 15,
-            "second_x": 50, "second_y": 50}
-MAX_BYTES = 5 * 1024 * 1024
+            "second_x": 50, "second_y": 50, "second_remove_black": False}
+MAX_BYTES = 20 * 1024 * 1024
 
 
 def get(cid: str) -> dict:
@@ -51,7 +51,7 @@ def save(cid: str, changes: dict) -> dict:
             raise ValueError(f"Invalid {k}.") from None
         if not lo <= new[k] <= hi:
             raise ValueError(f"{k} must be between {lo} and {hi}.")
-    for k in ("enabled", "second_enabled", "background_enabled"):
+    for k in ("enabled", "second_enabled", "background_enabled", "remove_black", "second_remove_black"):
         if not isinstance(new[k], bool):
             raise ValueError(f"Invalid {k}.")
     try:
@@ -83,8 +83,8 @@ def _store(cid: str, values: dict):
 def upload(cid: str, filename: str, content: bytes, second: bool = False) -> dict:
     old = get(cid)
     ext = Path(filename).suffix.lower()
-    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4") or len(content) > MAX_BYTES or not content:
-        raise ValueError("Upload a PNG, JPG, GIF, WEBP or MP4 logo under 5 MB.")
+    if ext not in (".png", ".jpg", ".jpeg", ".webp", ".gif", ".mp4") or len(content) > (MAX_BYTES if ext == ".mp4" else 5 * 1024 * 1024) or not content:
+        raise ValueError("Upload an image under 5 MB or an MP4 under 20 MB.")
     if ext == ".mp4":
         with tempfile.NamedTemporaryFile(suffix=".mp4") as sample:
             sample.write(content)
@@ -143,7 +143,8 @@ def upload(cid: str, filename: str, content: bytes, second: bool = False) -> dic
     target = folder / name
     target.write_bytes(saved)
     try:
-        _store(cid, {**old, ("second_logo_asset_path" if second else "logo_asset_path"): name})
+        _store(cid, {**old, ("second_logo_asset_path" if second else "logo_asset_path"): name,
+                     ("second_remove_black" if second else "remove_black"): ext == ".mp4"})
     except Exception:
         target.unlink(missing_ok=True)
         raise

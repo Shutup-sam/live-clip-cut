@@ -501,6 +501,7 @@ img.av{object-fit:cover}
 .brand-logo{position:absolute;width:20%;height:auto;max-height:100%;object-fit:contain;cursor:grab;touch-action:none;user-select:none}
 .brand-logo:active{cursor:grabbing}
 .brand-logo.back{background:#0008;padding:2px;border-radius:3px}
+.brand-logo.key-black{mix-blend-mode:screen}
 @media(max-width:700px){.brand-grid{grid-template-columns:1fr}.brand-frame{margin:auto}}
 .step .n{width:26px;height:26px;border-radius:999px;border:1px solid var(--line-2);background:#fff;display:grid;place-items:center;font-size:12px;font-weight:600;flex:none;color:var(--brand-ink)}
 .step b{display:block;font-weight:600;color:var(--text)}
@@ -1879,7 +1880,7 @@ function drawCreatorForm() {
         <label class="f">Minutes of live stream to keep<input data-k="buffer_min" type="number" value="${c.buffer_min}"></label></div></div>
     <div class="card"><h2>Creator Branding</h2><p class="help">Burn your logo into new clips. The preview updates as you adjust it.</p>
       <div class="brand-grid"><div><div class="brand-drop" id="branddrop" role="button" tabindex="0" aria-label="Upload creator logo">Drop a PNG, JPG, animated GIF/WEBP or short MP4 here, or <button class="btn sm" type="button" data-act="brandpick">Choose logo</button><input id="brandfile" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4" hidden></div>
-      <p class="help" style="margin:8px 0">${b.logo_asset_path ? `Logo uploaded · <button class="btn sm" type="button" data-act="brandremove">Remove logo</button>` : "No logo uploaded · maximum 5 MB, animation up to 30 seconds"}</p>
+      <p class="help" style="margin:8px 0">${b.logo_asset_path ? `Logo uploaded · <button class="btn sm" type="button" data-act="brandremove">Remove logo</button>` : "No logo uploaded · images up to 5 MB, MP4 up to 20 MB and 30 seconds"}</p>
       ${b.enabled && !b.logo_asset_path ? `<p class="help" style="color:var(--bad)">Upload a logo before enabling branding.</p>` : ""}
       <div class="fields"><label class="sw span"><input data-b="enabled" type="checkbox" ${b.enabled ? "checked" : ""}>Enable logo overlay</label>
         <label class="f">Position<select data-b="position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center",custom:"Custom (drag preview)"}, b.position)}</select></label>
@@ -1889,17 +1890,19 @@ function drawCreatorForm() {
         <label class="f">Opacity (%)<input data-b="opacity" type="range" min="0" max="100" value="${b.opacity}"></label>
         <label class="f">Padding (pixels)<input data-b="padding" type="number" min="0" max="300" value="${b.padding}"></label>
         <label class="sw span"><input data-b="background_enabled" type="checkbox" ${b.background_enabled ? "checked" : ""}>Add dark background behind logo</label>
+        <label class="sw span"><input data-b="remove_black" type="checkbox" ${b.remove_black ? "checked" : ""}>Remove solid black background from logo<small>Useful for MP4 logos with a black canvas. Dark details may also become transparent.</small></label>
         <label class="f">Display duration<select data-b="display_duration">${opts({entire:"Entire clip",custom:"Custom start and end"}, b.display_duration)}</select></label>
         <label class="f">Start (seconds)<input data-b="custom_start_time" type="number" min="0" step="0.1" value="${b.custom_start_time}"></label>
         <label class="f">End (seconds)<input data-b="custom_end_time" type="number" min="0" step="0.1" value="${b.custom_end_time}"></label></div>
       <h3>Second logo</h3><p class="help">Add a sponsor or another brand mark to the same clip.</p>
       <div class="brand-drop" id="branddrop2" role="button" tabindex="0" aria-label="Upload second logo">Drop a PNG, JPG, animated GIF/WEBP or short MP4 here, or <button class="btn sm" type="button" data-act="brandpick2">Choose second logo</button><input id="brandfile2" type="file" accept="image/png,image/jpeg,image/webp,image/gif,video/mp4" hidden></div>
-      <p class="help" style="margin:8px 0">${b.second_logo_asset_path ? `Second logo uploaded · <button class="btn sm" type="button" data-act="brandremove2">Remove second logo</button>` : "No second logo uploaded · maximum 5 MB, animation up to 30 seconds"}</p>
+      <p class="help" style="margin:8px 0">${b.second_logo_asset_path ? `Second logo uploaded · <button class="btn sm" type="button" data-act="brandremove2">Remove second logo</button>` : "No second logo uploaded · images up to 5 MB, MP4 up to 20 MB and 30 seconds"}</p>
       <div class="fields"><label class="sw span"><input data-b="second_enabled" type="checkbox" ${b.second_enabled ? "checked" : ""}>Enable second logo</label>
         <label class="f">Second logo position<select data-b="second_position">${opts({top_left:"Top Left",top_right:"Top Right",bottom_left:"Bottom Left",bottom_right:"Bottom Right",center:"Center",custom:"Custom (drag preview)"}, b.second_position || "bottom_right")}</select></label>
         <label class="f">Second logo width (% of video)<input data-b="second_width" type="number" min="1" max="80" value="${b.second_width || 15}"></label>
         <label class="f">Horizontal centre (%)<input data-b="second_x" type="number" min="0" max="100" value="${b.second_x ?? 50}"></label>
         <label class="f">Vertical centre (%)<input data-b="second_y" type="number" min="0" max="100" value="${b.second_y ?? 50}"></label></div>
+      <label class="sw span"><input data-b="second_remove_black" type="checkbox" ${b.second_remove_black ? "checked" : ""}>Remove solid black background from second logo</label>
       <button class="btn sm" type="button" data-act="brandreset">Reset to Defaults</button></div>
       <div><div class="brand-frame" aria-label="Portrait clip branding preview" ${sample ? `style="background-image:url('/media/${encodeURIComponent(sample[0])}/${encodeURIComponent(sample[1])}')"` : ""}><div class="brand-safe"></div>${b.logo_asset_path ? `${b.logo_asset_path.endsWith(".mp4") ? `<video class="brand-logo" id="brandlogo" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo?v=${b.updated_at || 0}" autoplay loop muted playsinline aria-label="Creator logo preview"></video>` : `<img class="brand-logo" id="brandlogo" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo?v=${b.updated_at || 0}" alt="Creator logo preview">`}` : ""}${b.second_logo_asset_path ? `${b.second_logo_asset_path.endsWith(".mp4") ? `<video class="brand-logo" id="brandlogo2" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo2?v=${b.updated_at || 0}" autoplay loop muted playsinline aria-label="Second logo preview"></video>` : `<img class="brand-logo" id="brandlogo2" draggable="false" src="/api/creators/${encodeURIComponent(c.id)}/branding/logo2?v=${b.updated_at || 0}" alt="Second logo preview">`}` : ""}</div><small class="sub">Drag a logo to place it anywhere. X/Y values set its centre.</small></div></div></div>
     <div class="card"><h2>Posting</h2><p class="help">${A.length ? "Choose the accounts this creator's clips go to. One account can be shared by several creators." : "No accounts are connected yet. Connect one in Settings, then come back."}</p>
@@ -1921,10 +1924,11 @@ const brandingForm = () => { const d = {}; $$("#cform [data-b]").forEach(i => d[
 function updateBrandPreview() {
   const frame = $(".brand-frame"), form = $("#cform"); if (!frame || !form) return;
   const b = brandingForm(), p = Math.min(45, b.padding / 1080 * 100);
-  for (const [id, position, width, opacity, enabled, background, x, y] of [["#brandlogo", b.position, b.width, b.opacity, b.enabled, b.background_enabled, b.x, b.y], ["#brandlogo2", b.second_position, b.second_width, 100, b.second_enabled, false, b.second_x, b.second_y]]) {
+  for (const [id, position, width, opacity, enabled, background, x, y, removeBlack] of [["#brandlogo", b.position, b.width, b.opacity, b.enabled, b.background_enabled, b.x, b.y, b.remove_black], ["#brandlogo2", b.second_position, b.second_width, 100, b.second_enabled, false, b.second_x, b.second_y, b.second_remove_black]]) {
     const img = $(id); if (!img) continue;
     Object.assign(img.style, {width:`${width}%`, maxWidth:`${100 - 2*p}%`, maxHeight:`${100 - 2*p}%`, opacity:enabled ? opacity/100 : 0.35, left:position === "custom" ? `${x}%` : position.includes("left") ? `${p}%` : position.includes("right") ? "auto" : "50%", right:position.includes("right") ? `${p}%` : "auto", top:position === "custom" ? `${y}%` : position.startsWith("top") ? `${p}%` : position.startsWith("bottom") ? "auto" : "50%", bottom:position.startsWith("bottom") ? `${p}%` : "auto", transform:position === "center" || position === "custom" ? "translate(-50%,-50%)" : "none"});
     img.classList.toggle("back", background);
+    img.classList.toggle("key-black", removeBlack);
     if (position === "custom") requestAnimationFrame(() => {
       const box = img.parentElement;
       img.style.left = `${Math.max(img.offsetWidth / 2, Math.min(box.clientWidth - img.offsetWidth / 2, box.clientWidth * x / 100))}px`;
@@ -2298,7 +2302,7 @@ document.addEventListener("drop", e => { const d = e.target.closest?.("#branddro
 document.addEventListener("change", e => { if (e.target.id === "brandfile" || e.target.id === "brandfile2") { uploadBrand(e.target.files[0], e.target.id === "brandfile2"); e.target.value = ""; } });
 async function uploadBrand(file, second = false) {
   if (!file) return;
-  if (!/^(image\/(png|jpeg|webp|gif)|video\/mp4)$/.test(file.type) || file.size > 5*1024*1024) return toast("Choose a PNG, JPG, GIF, WEBP or MP4 under 5 MB.", "bad");
+  if (!/^(image\/(png|jpeg|webp|gif)|video\/mp4)$/.test(file.type) || file.size > (file.type === "video/mp4" ? 20 : 5)*1024*1024) return toast("Choose an image under 5 MB or MP4 under 20 MB.", "bad");
   const id = creatorId(), form = new FormData(); form.append("file", file);
   const pending = $("#savebar")?.classList.contains("on") ? [...$$("#cform [data-k], #cform [data-b], #cform [data-acc]")].map(i => [i.value, i.checked]) : null;
   try { const b = $(second ? "#branddrop2" : "#branddrop"); b.textContent = "Uploading logo…"; const saved = await api(`/api/creators/${id}/branding/${second ? "logo2" : "logo"}`, {method:"POST",body:form}); creator().branding = saved; drawCreatorForm(); toast("Logo uploaded", "ok"); }
@@ -2535,7 +2539,7 @@ document.addEventListener("click", async e => {
     if (a === "brandpick2") { $("#brandfile2").click(); return; }
     if (a === "brandremove") { const saved = await api(`/api/creators/${creatorId()}/branding/logo`, {method:"DELETE"}); creator().branding = saved; drawCreatorForm(); return toast("Logo removed", "ok"); }
     if (a === "brandremove2") { const saved = await api(`/api/creators/${creatorId()}/branding/logo2`, {method:"DELETE"}); creator().branding = saved; drawCreatorForm(); return toast("Second logo removed", "ok"); }
-    if (a === "brandreset") { await api(`/api/creators/${creatorId()}/branding/logo`, {method:"DELETE"}); await api(`/api/creators/${creatorId()}/branding/logo2`, {method:"DELETE"}); creator().branding = await send(`/api/creators/${creatorId()}/branding`, {enabled:false,position:"top_right",width:20,x:50,y:50,opacity:100,padding:24,background_enabled:false,display_duration:"entire",custom_start_time:0,custom_end_time:0,second_enabled:false,second_position:"bottom_right",second_width:15,second_x:50,second_y:50}, "PUT"); drawCreatorForm(); return toast("Branding reset", "ok"); }
+    if (a === "brandreset") { await api(`/api/creators/${creatorId()}/branding/logo`, {method:"DELETE"}); await api(`/api/creators/${creatorId()}/branding/logo2`, {method:"DELETE"}); creator().branding = await send(`/api/creators/${creatorId()}/branding`, {enabled:false,position:"top_right",width:20,x:50,y:50,opacity:100,padding:24,background_enabled:false,remove_black:false,display_duration:"entire",custom_start_time:0,custom_end_time:0,second_enabled:false,second_position:"bottom_right",second_width:15,second_x:50,second_y:50,second_remove_black:false}, "PUT"); drawCreatorForm(); return toast("Branding reset", "ok"); }
     if (a === "pause") { await send("/api/settings", {paused:!S.overview.paused}, "PUT"); return loadOverview(); }
     if (a === "pcancel" || a === "pretry") { await api(`/api/posts/${d.id}/${a === "pcancel" ? "cancel" : "retry"}`, {method:"POST"}); return loadOverview(); }
     if (a === "ssave") { await saveSettings(); toast("Saved", "ok"); return drawSettings(); }

@@ -300,11 +300,11 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
     base = [encoder, "-y", "-v", "error", "-ss", f"{start:.2f}", "-t", f"{end - start:.2f}", "-i", str(src)]
     overlays = []
     if branding and branding.get("enabled"):
-        overlays.append((logo, branding["position"], branding["width"], branding["opacity"], branding["background_enabled"], branding["display_duration"], branding["x"], branding["y"]))
+        overlays.append((logo, branding["position"], branding["width"], branding["opacity"], branding["background_enabled"], branding["display_duration"], branding["x"], branding["y"], branding["remove_black"]))
     if branding and branding.get("second_enabled"):
-        overlays.append((second_logo, branding["second_position"], branding["second_width"], 100, False, "entire", branding["second_x"], branding["second_y"]))
+        overlays.append((second_logo, branding["second_position"], branding["second_width"], 100, False, "entire", branding["second_x"], branding["second_y"], branding["second_remove_black"]))
     previous = "captioned"
-    for n, (image, position, percent, opacity, background, duration, px, py) in enumerate(overlays, 1):
+    for n, (image, position, percent, opacity, background, duration, px, py, remove_black) in enumerate(overlays, 1):
         if not image or not image.is_file():
             raise ValueError("Branding is enabled, but a logo file is missing. Upload it again in Creator Branding.")
         overlay_file = f"logo{n}{image.suffix.lower()}"
@@ -315,7 +315,8 @@ def _render_in(work: Path, src: Path, out_dir: Path, name: str, start, end, layo
         pad = branding["padding"]
         width = max(2, int(W * percent / 100))
         height = max(2, H - 2 * pad)
-        fc += f";[{n}:v]setpts=PTS-STARTPTS,format=rgba,scale={width}:{height}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa={opacity / 100:.3f}[logo{n}]"
+        key = "colorkey=0x000000:0.04:0.02," if remove_black else ""
+        fc += f";[{n}:v]setpts=PTS-STARTPTS,format=rgba,{key}scale={width}:{height}:force_original_aspect_ratio=decrease,format=rgba,colorchannelmixer=aa={opacity / 100:.3f}[logo{n}]"
         label = f"logo{n}"
         if background:
             fc += f";[{label}]pad=iw+20:ih+20:10:10:color=black@0.55[backed{n}]"
